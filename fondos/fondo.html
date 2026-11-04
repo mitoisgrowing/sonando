@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Fondo</title>
+<style>
+  /* Fondos para el directo (1080×1920). Variante por #1, #2 o #3. Se renderizan con render.bat */
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: #020611; }
+  .bg { position: absolute; inset: 0; }
+  .blob { position: absolute; border-radius: 50%; filter: blur(140px); }
+  svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<div class="bg" id="bg"></div>
+<svg id="tex" viewBox="0 0 1080 1920" aria-hidden="true"></svg>
+<script>
+const V = {
+  // 1: azul noche con luz cian arriba y añil abajo, grano fino
+  1: { base: '#030a1f', blobs: [[260, 300, 900, '#1f5bd8', .85], [880, 820, 760, '#0e2f86', .9], [300, 1500, 980, '#2a1f9e', .7], [820, 1720, 620, '#0b6fd1', .55]], grain: .9, fibre: .18, seed: 7 },
+  // 2: azul eléctrico, más contraste y una franja de luz diagonal
+  2: { base: '#02071a', blobs: [[540, 960, 1100, '#0a3fd0', .75], [120, 260, 700, '#4a8bff', .6], [1000, 1600, 820, '#1a1a8f', .85], [900, 300, 520, '#00a6ff', .35]], grain: 1, fibre: .25, seed: 21, sweep: true },
+  // 3: azul pizarra, calmado y textura de papel más marcada
+  3: { base: '#06101f', blobs: [[200, 600, 1000, '#24456f', .9], [900, 1300, 900, '#163a6b', .9], [540, 120, 700, '#3c6aa6', .55], [540, 1900, 900, '#0d2a55', .8]], grain: .8, fibre: .45, seed: 3 },
+}[location.hash.slice(1) || 1];
+
+document.body.style.background = V.base;
+document.getElementById('bg').innerHTML = V.blobs.map(([x, y, d, c, o]) =>
+  `<span class="blob" style="left:${x - d / 2}px;top:${y - d / 2}px;width:${d}px;height:${d}px;background:${c};opacity:${o}"></span>`).join('')
+  + (V.sweep ? '<span class="blob" style="left:-200px;top:700px;width:1600px;height:260px;border-radius:200px;transform:rotate(-28deg);background:#7fb4ff;opacity:.22;filter:blur(90px)"></span>' : '');
+
+// textura de papel suave (nubes de baja frecuencia, en todas direcciones) + viñeta
+document.getElementById('tex').innerHTML = `
+  <filter id="paper" x="0" y="0" width="100%" height="100%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="5" seed="${V.seed}"/>
+    <feColorMatrix type="matrix" values="0 0 0 0 0.8  0 0 0 0 0.88  0 0 0 0 1  0 0 0 ${V.fibre * 1.6} -${V.fibre * 0.4}"/>
+  </filter>
+  <radialGradient id="vig" cx="50%" cy="45%" r="75%"><stop offset="55%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity=".55"/></radialGradient>
+  <rect width="1080" height="1920" filter="url(#paper)" style="mix-blend-mode:soft-light"/>
+  <rect width="1080" height="1920" fill="url(#vig)"/>`;
+
+// grano de película: ruido aleatorio por píxel (sin rejilla), mezclado en overlay
+const c = document.createElement('canvas'); c.width = 1080; c.height = 1920;
+c.style.cssText = 'position:absolute;inset:0;mix-blend-mode:overlay;opacity:' + (0.28 * V.grain);
+const g = c.getContext('2d'), img = g.createImageData(1080, 1920), d = img.data;
+let x = V.seed * 9973; const rnd = () => ((x = (Math.imul(x, 1103515245) + 12345) & 0x7fffffff) / 0x7fffffff);
+for (let k = 0; k < d.length; k += 4) { const v = 128 + (rnd() + rnd() + rnd() - 1.5) * 90; d[k] = d[k + 1] = d[k + 2] = v; d[k + 3] = 255; }
+g.putImageData(img, 0, 0); document.body.append(c);
+</script>
+</body>
+</html>

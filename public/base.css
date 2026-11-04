@@ -1,0 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..800&display=swap');
+
+:root {
+  --bg: #0b0a0c;
+  --ink: #f7f5f6;
+  --ink-2: rgb(247 245 246 / 0.62);
+  --ink-3: rgb(247 245 246 / 0.52);
+  --line: rgb(255 255 255 / 0.09);
+  --fill: rgb(255 255 255 / 0.06);
+  --fill-2: rgb(255 255 255 / 0.11);
+  --rose: oklch(0.7 0.19 12);
+  --rose-ink: oklch(0.86 0.09 12);
+  --ok: oklch(0.78 0.15 150);
+  --warn: oklch(0.8 0.13 75);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; margin: 0; }
+html, body { background: var(--bg); color: var(--ink); }
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv11', 'ss01';
+}
+::selection { background: color-mix(in oklch, var(--rose) 55%, transparent); color: #fff; }
+img { display: block; }
+.num { font-variant-numeric: tabular-nums; }
+svg.i { width: 1em; height: 1em; flex: none; }
+/* la foto va encima de la inicial; las insignias de la cola pueden colocarla en absoluto */
+.av { position: relative; overflow: hidden; }

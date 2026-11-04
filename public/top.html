@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sonando · Top</title>
+<link rel="stylesheet" href="/base.css">
+<style>
+  html, body { min-height: 100%; }
+  body { background: radial-gradient(70% 50% at 50% 0%, oklch(0.24 0.06 85 / .35), transparent 70%), #0b0a0c; }
+  main { max-width: 760px; margin: 0 auto; padding: 36px 24px 64px; }
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .btn { height: 38px; padding: 0 14px; border-radius: 12px; display: inline-flex; align-items: center; gap: 8px; border: 0; cursor: pointer; font: inherit; font-weight: 650;
+    background: rgb(255 255 255 / .08); color: var(--ink); text-decoration: none; transition: transform 140ms var(--ease-out), background-color 150ms ease; }
+  .btn:active { transform: scale(.97); }
+  @media (hover: hover) { .btn:hover { background: rgb(255 255 255 / .14); } }
+  .btn svg { width: 16px; height: 16px; }
+  h1 { font-size: 44px; font-weight: 800; letter-spacing: -0.04em; margin: 40px 0 8px; }
+  .sub { color: var(--ink-2); }
+
+  /* pestañas: el fondo blanco se desliza a la elegida */
+  .tabs { position: relative; display: inline-grid; grid-template-columns: 1fr 1fr; margin: 26px 0 22px; padding: 4px; border-radius: 99px; background: rgb(255 255 255 / .06); }
+  .tabs button { position: relative; z-index: 1; height: 36px; padding: 0 20px; border: 0; background: none; font: inherit; font-weight: 650; color: var(--ink-2); cursor: pointer; transition: color 200ms ease; }
+  .tabs button[aria-selected="true"] { color: #111; }
+  .tabs .thumb { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 99px; background: var(--ink); transition: transform 320ms var(--ease-drawer); }
+  .tabs[data-i="1"] .thumb { transform: translateX(100%); }
+
+  /* podio para los 3 primeros */
+  .podium { display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 12px; align-items: end; margin-bottom: 18px; }
+  .pod { display: grid; justify-items: center; gap: 10px; padding: 22px 12px 18px; border-radius: 22px; background: rgb(255 255 255 / .045); text-align: center; min-width: 0; }
+  .pod.p1 { padding-top: 30px; background: linear-gradient(170deg, oklch(0.42 0.1 85 / .45), rgb(255 255 255 / .04) 70%); }
+  .pod .av { width: 64px; height: 64px; font-size: 24px; }
+  .pod.p1 .av { width: 84px; height: 84px; font-size: 30px; box-shadow: 0 0 0 3px oklch(0.86 0.13 90); }
+  .pod .medal { font-size: 13px; font-weight: 800; letter-spacing: .08em; color: var(--ink-3); }
+  .pod.p1 .medal { color: oklch(0.86 0.13 90); }
+  .pod.p2 .medal { color: oklch(0.85 0.02 250); } .pod.p3 .medal { color: oklch(0.72 0.09 55); }
+  .pod b { font-size: 16px; font-weight: 700; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pod .pts { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .pod .pts small { font-size: 13px; color: var(--ink-3); font-weight: 600; margin-left: 4px; }
+
+  .list { list-style: none; padding: 0; display: grid; gap: 4px; }
+  .list li { display: grid; grid-template-columns: 34px 40px 1fr auto; gap: 14px; align-items: center; padding: 10px 14px; border-radius: 14px; }
+  .list li:nth-child(odd) { background: rgb(255 255 255 / .03); }
+  .list .n { color: var(--ink-3); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+  .list .av { width: 40px; height: 40px; font-size: 16px; }
+  .list b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .list small { color: var(--ink-3); font-size: 12.5px; }
+  .list .p { font-weight: 750; font-variant-numeric: tabular-nums; }
+  .av { border-radius: 50%; display: grid; place-items: center; font-weight: 700; color: #fff; }
+  .empty { color: var(--ink-3); padding: 40px 0; text-align: center; line-height: 1.6; }
+  .fade { animation: in 380ms var(--ease-out) both; }
+  @keyframes in { from { opacity: 0; transform: translateY(8px); } }
+  @media (max-width: 560px) { .podium { grid-template-columns: 1fr; } .pod.p1 { order: -1; } }
+  @media (prefers-reduced-motion: reduce) { .fade { animation: none; } .tabs .thumb { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="bar">
+    <a class="btn" href="/" id="back"></a>
+    <a class="btn" href="/control">Panel de control</a>
+  </div>
+  <h1>Top de espectadores</h1>
+  <p class="sub">Puntos por escribir en el chat, pedir canciones, tus veredictos y los regalos.</p>
+  <div class="tabs" id="tabs" role="tablist" data-i="0">
+    <span class="thumb"></span>
+    <button role="tab" aria-selected="true" data-scope="session">Este directo</button>
+    <button role="tab" aria-selected="false" data-scope="total">De siempre</button>
+  </div>
+  <div id="out"></div>
+</main>
+<script type="module">
+import { esc, avatar } from '/live.js';
+const $ = id => document.getElementById(id);
+$('back').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>Inicio';
+let scope = 'session', sig = '';
+// /top?demo: espectadores de prueba para ver cómo queda con mucha gente (no se guardan en ningún sitio)
+const DEMO = new URLSearchParams(location.search).has('demo');
+const NAMES = ['luna.mp3','davidd','sofi_rk','xavi99','ana.beats','shiroo','pablo_rk','mery','aleegmzzz_','_samueel_.01','carla.wav','nico808','iker_trap','martina','bruno.lofi','vale_ix','juanma','txus','noa','lucia_bb','hugo.mp3','ines','dani_drill','paula','marcos07','irene','alex.rnb','claudia','sergio','eva.dembow','raul','nerea','pol','julia','oscar','sara.mp3','adri','leire','mario','zoe'];
+function demo(sc) {
+  let x = sc === 'total' ? 7 : 3; const rnd = () => (x = (x * 9301 + 49297) % 233280) / 233280;
+  const rows = NAMES.map((n, i) => ({ id: 'demo' + i, nick: n, handle: n, avatar: '', pts: Math.round((sc === 'total' ? 2400 : 420) * Math.pow(rnd(), 2.2)) + 1 }));
+  rows.sort((a, b) => b.pts - a.pts); return { rows, count: rows.length };
+}
+async function load(animate) {
+  const r = DEMO ? demo(scope) : await (await fetch(`/api/top?scope=${scope}`)).json();
+  const s = JSON.stringify(r.rows.map(x => [x.id, x.pts]));
+  if (s === sig && !animate) return; sig = s;
+  const rows = r.rows;
+  if (!rows.length) { $('out').innerHTML = `<p class="empty fade">${scope === 'session' ? 'En este directo todavía nadie tiene puntos.<br>Se suman al escribir, pedir canciones o regalar.' : 'Todavía no hay puntos guardados.'}</p>`; return; }
+  const [a, b, c] = rows;
+  const pod = (x, k) => x ? `<div class="pod p${k}"><span class="medal">${k}º</span>${avatar(x, k === 1 ? 84 : 64)}<b>${esc(x.nick)}</b><span class="pts">${x.pts}<small>pts</small></span></div>` : '<div></div>';
+  $('out').innerHTML = `<div class="podium ${animate ? 'fade' : ''}">${pod(b, 2)}${pod(a, 1)}${pod(c, 3)}</div>
+    <ol class="list ${animate ? 'fade' : ''}">${rows.slice(3).map((x, i) => `<li><span class="n">${i + 4}</span>${avatar(x, 40)}<span><b>${esc(x.nick)}</b>${x.handle && x.handle !== x.nick ? `<small>@${esc(x.handle)}</small>` : ''}</span><span class="p">${x.pts}</span></li>`).join('')}</ol>`;
+}
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-scope]'); if (!b || b.dataset.scope === scope) return;
+  scope = b.dataset.scope;
+  $('tabs').dataset.i = scope === 'total' ? 1 : 0;
+  $('tabs').querySelectorAll('button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+  load(true);
+});
+load(true); setInterval(() => load(false), 4000); // se actualiza solo
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+# dependencias y lo que se genera al construir
+node_modules/
+build/out/
+dist/
+
+# datos personales: tokens de Spotify, usuario de TikTok, cola, errores
+data/
+
+# GIF/vídeos de alertas que pone cada uno
+public/alerts/*
+!public/alerts/.gitkeep
+
+# pruebas y archivos de diseño de Impeccable
+public/_test/
+.impeccable/

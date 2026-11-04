@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sonando</title>
+<link rel="stylesheet" href="/base.css">
+<style>
+  html, body { height: 100%; overflow: hidden; background: #000; }
+
+  /* Lienzo 16:9 fijo a 1920×1080: va en la franja central del directo, entre tus fotos y el chat de TikTok */
+  .stage {
+    position: fixed; left: 0; top: 0; width: var(--w, 1920px); height: var(--h, 1080px);
+    transform: scale(var(--s, 1)); transform-origin: 0 0;
+    overflow: hidden; background: var(--bg);
+    display: grid; grid-template-columns: 1fr 600px; grid-template-rows: auto 1fr auto auto;
+    column-gap: 80px; padding: 60px 72px 52px;
+    transition: padding-top 640ms cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  /* cuando llega una donación todo baja con suavidad para dejar sitio a la isla: no tapa nada */
+  .stage.alerting { padding-top: 186px; }
+
+  /* Fondo: la portada, enorme y desenfocada, girando muy despacio */
+  .bg, .bg-layer { position: absolute; inset: 0; }
+  .bg { z-index: 0; }
+  .bg-layer { opacity: 1; transition: opacity 1400ms ease; }
+  @starting-style { .bg-layer { opacity: 0; } }
+  /* rendimiento: se desenfoca una imagen pequeña (425px, 28px) y se amplía x4: mismo aspecto, ~16 veces menos píxeles que desenfocar */
+  .blob { position: absolute; width: 425px; height: 425px; will-change: transform; transform: scale(4); }
+  .blob img { width: 100%; height: 100%; object-fit: cover; filter: blur(28px) saturate(1.7) brightness(0.8); }
+  .blob.a { left: 18px; top: 218px; animation: spin 48s linear infinite; }
+  .blob.b { right: -82px; bottom: 78px; animation: spin 66s linear infinite reverse; opacity: .85; }
+  @keyframes spin { from { transform: scale(4) rotate(0); } to { transform: scale(4) rotate(1turn); } }
+  .bg::after {
+    content: ''; position: absolute; inset: 0;
+    background:
+      linear-gradient(180deg, rgb(0 0 0 / .55) 0%, rgb(0 0 0 / .12) 22%, rgb(0 0 0 / .1) 60%, rgb(0 0 0 / .62) 100%),
+      rgb(8 6 10 / .28);
+  }
+  .stage > :not(.bg, .toast, .verdict, .fx-flash, .bars, .fin, .finword) { position: relative; z-index: 3; }
+
+  /* Ritmo: el fondo late con los graves; en modo cine o en el drop, más fuerte y con franjas */
+  .bg { will-change: transform; }
+  .fx-flash { position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0;
+    background: radial-gradient(70% 70% at 35% 45%, rgb(255 255 255 / .16), transparent 70%); }
+  .bars i { position: absolute; left: 0; right: 0; height: 44px; z-index: 1; background: linear-gradient(#000 55%, transparent); /* fino: cabe en el margen y no llega a los textos */
+    transform: translateY(-101%); transition: transform 700ms var(--ease-drawer); }
+  .bars i:first-child { top: 0; }
+  .bars i:last-child { bottom: 0; transform: translateY(101%); background: linear-gradient(transparent, #000 45%); }
+  .stage.cine .bars i { transform: none; }
+
+  /* Sonando ahora */
+  .np { grid-column: 1; grid-row: 1; display: grid; grid-template-columns: 136px 1fr; gap: 30px; align-items: center; }
+  /* en pantalla grande la portada pequeña se convierte en la grande: aquí desaparece y el texto ocupa su sitio */
+  .np .art { transition: opacity 260ms ease; }
+  .np > div { transition: transform 820ms var(--ease-drawer); }
+  .stage.cover .np .art { opacity: 0; transition-duration: 0ms; }
+  .stage.cover .np > div { transform: translateX(-166px); }
+  .np .art {
+    width: 136px; height: 136px; border-radius: 18px; object-fit: cover; background: var(--fill-2);
+    box-shadow: 0 20px 50px -12px rgb(0 0 0 / .6), 0 2px 8px rgb(0 0 0 / .3);
+  }
+  .np > div { min-width: 0; }
+  .trow { display: flex; align-items: center; gap: 18px; min-width: 0; }
+  .trow .title { min-width: 0; }
+  .badges { display: flex; align-items: center; gap: 12px; flex: none; }
+  .badge { position: relative; width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+  .badge svg.i { width: 32px; height: 32px; stroke-width: 2.6; color: #fff; }
+  /* aprobada: tick verde que baila */
+  .badge.ok { background: linear-gradient(140deg, oklch(0.74 0.17 150), oklch(0.58 0.15 160));
+    box-shadow: 0 10px 26px -8px oklch(0.6 0.16 150 / .7); }
+  @keyframes groove {
+    0%, 100% { transform: translateY(0) rotate(-9deg); }
+    25% { transform: translateY(-7px) rotate(0deg) scale(1.06); }
+    50% { transform: translateY(0) rotate(9deg); }
+    75% { transform: translateY(-7px) rotate(0deg) scale(1.06); }
+  }
+  /* corazón: guardada en Me gusta, late */
+  .badge.love { background: linear-gradient(140deg, oklch(0.72 0.2 12), oklch(0.58 0.21 5));
+    box-shadow: 0 10px 26px -8px oklch(0.6 0.2 10 / .7); }
+  .badge.love svg.i { fill: #fff; stroke: none; }
+  @keyframes heart { 0%, 40%, 100% { transform: scale(1); } 15% { transform: scale(1.16); } 28% { transform: scale(1.04); } }
+  /* cuenta atrás para saltar: anillo que se vacía y número */
+  .badge.count { width: 74px; height: 74px; background: rgb(0 0 0 / .35); }
+  .badge.count svg.ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .badge.count circle { fill: none; stroke-width: 5; }
+  .badge.count .track { stroke: rgb(255 255 255 / .15); }
+  .badge.count .left { stroke: oklch(0.72 0.19 25); stroke-linecap: round; }
+  .badge.count b { position: relative; font-size: 30px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .badge.count.hurry b { color: oklch(0.82 0.15 25); }
+  .badge.meh { background: linear-gradient(140deg, oklch(0.78 0.11 80), oklch(0.62 0.1 70)); box-shadow: 0 10px 26px -8px oklch(0.6 0.1 75 / .6); }
+  .badge.saved { width: auto; height: 50px; padding: 0 20px 0 14px; border-radius: 99px; gap: 8px; display: flex;
+    background: linear-gradient(140deg, oklch(0.72 0.14 240), oklch(0.56 0.15 255)); font-size: 22px; font-weight: 750; }
+  .badge.saved svg.i { width: 26px; height: 26px; }
+  @media (prefers-reduced-motion: reduce) { .badge.ok, .badge.love { animation: none; } }
+  .np .title { font-size: 50px; font-weight: 740; letter-spacing: -0.03em; line-height: 1.05;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np .artist { font-size: 32px; font-weight: 500; color: var(--ink-2); margin-top: 6px; letter-spacing: -0.015em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .by { display: flex; align-items: center; gap: 12px; margin-top: 12px; font-size: 24px; color: var(--ink-2); }
+  .by b { color: var(--ink); font-weight: 600; }
+  .by:empty { display: none; }
+  .bar { grid-column: 1 / -1; grid-row: 4; display: grid; grid-template-columns: auto 1fr auto; gap: 22px; align-items: center;
+    font-size: 24px; font-weight: 600; color: var(--ink-2); margin-top: 28px; }
+  .bar .track { height: 8px; border-radius: 99px; background: rgb(255 255 255 / .16); overflow: hidden; }
+  .bar .fill { height: 100%; background: rgb(255 255 255 / .9); transform-origin: left; transform: scaleX(0); border-radius: inherit; }
+  .stage.empty .bar { visibility: hidden; }
+
+  /* Letra */
+  .lyrics { grid-column: 1; grid-row: 2; position: relative; overflow: hidden; margin: 24px -8px 0; padding: 0 8px;
+    mask-image: linear-gradient(180deg, transparent 0, #000 12%, #000 78%, transparent 100%); }
+  .lines { transition: transform 720ms var(--ease-drawer); will-change: transform; padding-top: 40px; }
+  .line {
+    font-size: 84px; font-weight: 780; letter-spacing: -0.034em; line-height: 1.08;
+    margin-bottom: 34px; text-wrap: balance; max-width: 1140px;
+    opacity: .3; transform-origin: left center; transform: scale(.965);
+    transition: opacity 500ms ease, transform 620ms var(--ease-drawer), filter 500ms ease;
+  }
+  .line.on { opacity: 1; transform: none; filter: none !important; }
+  .line.past { opacity: .22; }
+  .line.gap { display: flex; gap: 22px; height: 90px; align-items: center; margin-bottom: 34px; }
+  .line.gap i { width: 24px; height: 24px; border-radius: 50%; background: currentColor; opacity: .5; }
+  .line.gap.on i { animation: breathe 1.6s ease-in-out infinite; }
+  .line.gap.on i:nth-child(2) { animation-delay: .2s; } .line.gap.on i:nth-child(3) { animation-delay: .4s; }
+  @keyframes breathe { 50% { opacity: 1; transform: scale(1.15); } }
+  .lines.plain .line { font-size: 60px; opacity: .78; transform: none; margin-bottom: 22px; }
+  .lyrics .note { position: absolute; left: 8px; top: 40px; font-size: 44px; font-weight: 600; color: var(--ink-3); letter-spacing: -0.02em; }
+
+  /* Sin letra: la portada en grande ocupa la columna de la música */
+  .bigart { grid-column: 1; grid-row: 2; display: none; align-items: center; justify-content: center; min-height: 0; padding: 30px 0 0; }
+  .bigart img { transform-origin: 0 0; height: 100%; max-height: 760px; aspect-ratio: 1; max-width: 100%; object-fit: cover; border-radius: 30px;
+    box-shadow: 0 40px 100px -24px rgb(0 0 0 / .7), 0 4px 14px rgb(0 0 0 / .3); }
+  .stage.cover .bigart { display: flex; }
+  .stage.cover .lyrics { display: none; }
+
+  /* Pantalla en espera */
+  .idle { grid-column: 1; grid-row: 1 / 3; align-self: center; display: none; }
+  .stage.empty .idle { display: block; }
+  .stage.empty .bg { background: radial-gradient(70% 80% at 12% 30%, oklch(0.32 0.09 12 / .9), transparent 70%),
+    radial-gradient(60% 70% at 95% 90%, oklch(0.28 0.07 300 / .8), transparent 70%); }
+  .stage.empty .np, .stage.empty .lyrics, .stage.empty .bigart { display: none; }
+  .idle h1 { font-size: 124px; font-weight: 800; letter-spacing: -0.04em; line-height: .96; text-wrap: balance; max-width: 1100px; }
+  .idle p { font-size: 40px; color: var(--ink-2); margin-top: 30px; line-height: 1.3; max-width: 900px; letter-spacing: -0.015em; }
+
+  /* Medidor de -50 a +50: cuánto te está gustando la canción */
+  /* el hueco de arriba es para el número que sale al parar el medidor: así no cae encima de la portada ni de la letra */
+  .meter { grid-column: 1; grid-row: 3; margin-top: 118px; display: none; }
+  .meter.on { display: block; }
+  .meter .rail { position: relative; height: 34px; border-radius: 99px; overflow: hidden;
+    background: rgb(255 255 255 / .07); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08); }
+  /* el degradado completo, encendido solo entre el centro y el valor */
+  .meter .grad { position: absolute; inset: 0; border-radius: inherit;
+    background: linear-gradient(90deg, oklch(0.62 0.2 25), oklch(0.74 0.15 55) 30%, oklch(0.86 0.13 90) 50%, oklch(0.78 0.16 140) 70%, oklch(0.7 0.17 155));
+    opacity: .9; clip-path: inset(0 50% 0 50%); transition: clip-path 520ms var(--ease-drawer); }
+  .meter .ticks { position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(2% - 2px), rgb(0 0 0 / .28) calc(2% - 2px) 2%); }
+  .meter .mid { position: absolute; left: 50%; top: 6px; bottom: 6px; width: 2px; margin-left: -1px; background: rgb(255 255 255 / .5); border-radius: 2px; }
+  /* la pastilla va montada sobre la barra (centrada en ella, no en todo el bloque) y nunca se sale por los lados */
+  .meter .knob { position: absolute; left: 0; right: 0; top: 17px; height: 0; }
+  /* en el borde queda pegada al final de la barra (no se sale ni se queda corta); en medio, centrada en su valor */
+  .meter .knob span { position: absolute; top: 0; left: var(--p, 50%); transform: translate(calc(var(--p, 50%) * -1), -50%);
+    display: flex; align-items: baseline; gap: 10px; padding: 9px 18px 8px; border-radius: 16px; white-space: nowrap; background: #0b0a0c; color: #fff;
+    box-shadow: 0 8px 24px -8px rgb(0 0 0 / .7), inset 0 0 0 2px var(--kc, #fff); transition: left 520ms var(--ease-drawer), transform 520ms var(--ease-drawer), box-shadow 300ms ease; }
+  .meter .knob b { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .meter .knob small { font-size: 14px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--kc, #fff); }
+  .meter .labels { display: flex; justify-content: space-between; margin-top: 18px; font-size: 19px; font-weight: 600; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+  /* +50 Temazo: la pantalla se tiñe del color de la portada, rayas de velocidad y el número en grande */
+  .fin { position: absolute; inset: 0; z-index: 2; pointer-events: none; visibility: hidden; }
+  .fin.run { visibility: visible; }
+  .fin .tint { position: absolute; inset: 0; opacity: 0;
+    background: radial-gradient(70% 70% at 35% 55%, color-mix(in oklch, var(--fc) 70%, transparent), color-mix(in oklch, var(--fc) 35%, #000) 100%); }
+  .fin .rays { position: absolute; left: 35%; top: 55%; width: 3000px; height: 3000px; margin: -1500px 0 0 -1500px; opacity: 0;
+    background: repeating-conic-gradient(from 0deg, color-mix(in oklch, var(--fc) 85%, #fff) 0 .5deg, transparent .5deg 6deg);
+    mask: radial-gradient(circle, transparent 0 16%, rgb(0 0 0 / .8) 30%, rgb(0 0 0 / .5) 44%, transparent 60%); }
+  .finword { position: absolute; z-index: 4; left: 0; top: 0; transform-origin: 50% 100%;
+    text-align: center; pointer-events: none; opacity: 0; color: #fff; white-space: nowrap;
+    text-shadow: 0 8px 40px color-mix(in oklch, var(--wc, #fff) 70%, #000); }
+  .finword b { display: block; font-size: 64px; font-weight: 860; letter-spacing: -0.05em; line-height: .9; font-variant-numeric: tabular-nums; }
+  .finword span { display: block; font-size: 20px; font-weight: 760; letter-spacing: .22em; margin-top: 6px; color: color-mix(in oklch, var(--wc, #fff) 60%, #fff); }
+
+  /* Columna derecha: la cola */
+  .side { grid-column: 2; grid-row: 1 / 4; display: grid; grid-template-rows: auto 1fr auto; min-height: 0;
+    padding: 36px 36px 32px; border-radius: 34px; background: rgb(10 6 12 / .34);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / .07); }
+  .side h2 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: baseline; }
+  .side h2 span { color: var(--ink-3); font-weight: 600; font-size: 24px; }
+  .q { position: relative; list-style: none; padding: 0; display: grid; gap: 18px; align-content: start; overflow: hidden; }
+  .q li { display: grid; grid-template-columns: 30px 80px 1fr auto; gap: 18px; align-items: center; }
+  .q .pos { font-size: 24px; font-weight: 650; color: var(--ink-3); text-align: right; }
+  .q .cv { position: relative; display: block; width: 80px; height: 80px; }
+  .q .who .av { position: absolute; right: -7px; bottom: -7px; width: 34px; height: 34px; font-size: 15px;
+    box-shadow: 0 0 0 3px rgb(18 14 22), 0 4px 10px rgb(0 0 0 / .45); }
+  .q img.cover { width: 80px; height: 80px; border-radius: 13px; object-fit: cover; background: var(--fill-2); }
+  .q .t { min-width: 0; }
+  .q .t b { display: block; font-size: 31px; font-weight: 650; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .q .t small { display: block; font-size: 23px; color: var(--ink-2); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .q .coins { display: flex; align-items: center; gap: 8px; font-size: 23px; font-weight: 700;
+    padding: 6px 14px 6px 7px; border-radius: 99px; background: rgb(255 255 255 / .12); }
+  .q .coins img { width: 28px; height: 28px; }
+  .q li.locked .pos { color: var(--ink); }
+  .top { margin-top: 18px; }
+  .top h3 { font-size: 24px; font-weight: 700; color: var(--ink-2); letter-spacing: -0.01em; margin-bottom: 12px; }
+  .top ol { list-style: none; padding: 0; display: grid; gap: 10px; }
+  .top li { display: grid; grid-template-columns: 26px 44px 1fr auto; gap: 14px; align-items: center; transition: transform 500ms var(--ease-drawer); }
+  .top .n { font-size: 22px; font-weight: 700; color: var(--ink-3); text-align: right; font-variant-numeric: tabular-nums; }
+  .top .av { width: 44px; height: 44px; font-size: 18px; }
+  .top b { font-size: 26px; font-weight: 650; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .top span.p { font-size: 24px; font-weight: 750; font-variant-numeric: tabular-nums; color: var(--ink); }
+  .top li:first-child span.p { color: oklch(0.86 0.13 90); }
+  /* fila de portadas de las que no caben: se solapan un poco y al final cuántas quedan */
+  .q li.rest { display: flex; align-items: center; gap: 12px; padding-left: 48px; }
+  .q li.rest figure { position: relative; margin: 0; }
+  .q li.rest img { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; background: var(--fill-2); }
+  .q li.rest figcaption { position: absolute; left: 5px; bottom: 5px; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 99px;
+    display: grid; place-items: center; font-size: 15px; font-weight: 800; color: #fff; background: rgb(0 0 0 / .62); backdrop-filter: blur(6px); }
+  .q li.rest span { margin-left: 6px; font-size: 26px; font-weight: 750; color: var(--ink-2); }
+  .q .more { font-size: 23px; color: var(--ink-3); grid-template-columns: 1fr; padding-left: 48px; }
+  .av { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; display: grid; place-items: center;
+    font-size: 18px; font-weight: 700; color: #fff; flex: none; }
+
+  /* Donación: isla negra que se expande arriba en el centro, como una notificación de iPhone */
+  .toast {
+    position: absolute; left: 50%; top: 26px; z-index: 9; height: 64px; width: 230px; margin-left: -115px;
+    border-radius: 999px; background: #000; overflow: hidden; opacity: 0; pointer-events: none;
+    box-shadow: 0 24px 60px -14px rgb(0 0 0 / .75);
+  }
+  .toast .in { position: absolute; left: 0; top: 0; min-width: 100%; height: 138px; padding: 0 48px 0 26px; white-space: nowrap; opacity: 0;
+    display: flex; align-items: center; gap: 24px; }
+  .toast .in > .av { width: 86px; height: 86px; font-size: 36px; flex: none; }
+  .toast .txt { flex: 1; }
+  .toast .who { display: flex; align-items: baseline; gap: 22px; font-size: 40px; font-weight: 760; letter-spacing: -0.03em; line-height: 1.05; }
+  .toast .amt { margin-left: auto; display: inline-flex; align-items: center; gap: 10px; font-size: 30px; font-weight: 650; color: rgb(255 255 255 / .75); letter-spacing: -0.01em; }
+  .toast .amt img { width: 34px; height: 34px; align-self: center; }
+  .toast .gift { font-size: 28px; font-weight: 500; color: rgb(255 255 255 / .7); margin-top: 8px; letter-spacing: -0.01em; }
+  .toast .gift b { color: #fff; font-weight: 650; }
+  .toast .gimg { width: 36px; height: 36px; object-fit: contain; vertical-align: -9px; margin: 0 6px 0 4px; }
+
+  .locked-badge { display: inline-flex; align-items: center; margin-left: 12px; padding: 6px 16px;
+    border-radius: 99px; font-size: 22px; font-weight: 600; color: var(--ink); background: rgb(255 255 255 / .14); }
+
+  /* Veredicto: suspense (círculo que piensa) y luego se transforma en el resultado */
+  /* centrado sobre la letra (columna de la música), no sobre la cola */
+  .verdict { --vx: calc((var(--w, 1920px) - 680px) / 2); position: absolute; inset: 0; z-index: 6; pointer-events: none; visibility: hidden; }
+  .verdict.run { visibility: visible; }
+  .v-core { position: absolute; left: var(--vx); top: 50%; width: 150px; height: 150px; margin: -75px 0 0 -75px; border-radius: 75px;
+    display: flex; align-items: center; justify-content: center; gap: 26px; overflow: hidden;
+    background: rgb(255 255 255 / .1); backdrop-filter: blur(24px); box-shadow: inset 0 0 0 2px rgb(255 255 255 / .18); opacity: 0; }
+  .v-fill { position: absolute; inset: 0; clip-path: circle(0% at 50% 50%); }
+  .meh .v-fill { background: linear-gradient(135deg, oklch(0.78 0.11 80), oklch(0.6 0.1 68)); }
+  .save .v-fill { background: linear-gradient(135deg, oklch(0.72 0.14 240), oklch(0.55 0.15 255)); }
+  .like .v-fill { background: linear-gradient(135deg, oklch(0.7 0.17 150), oklch(0.55 0.15 165)); }
+  .skip .v-fill { background: linear-gradient(135deg, oklch(0.64 0.21 25), oklch(0.5 0.19 15)); }
+  .v-ring { position: absolute; inset: 14px; border-radius: 50%;
+    background: conic-gradient(from 0deg, transparent 0 55%, rgb(255 255 255 / .95) 100%);
+    mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px)); }
+  .v-q { position: relative; font-size: 64px; font-weight: 800; color: #fff; }
+  .v-icon { position: relative; width: 96px; height: 96px; display: none; }
+  .v-icon path { fill: none; stroke: #fff; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; }
+  .v-word { position: relative; display: none; font-size: 104px; font-weight: 840; letter-spacing: -0.045em; color: #fff; white-space: nowrap; }
+  .v-word i { display: inline-block; font-style: normal; opacity: 0; }
+  .save .v-spark { background: oklch(0.88 0.1 240); }
+  .v-spark { position: absolute; left: var(--vx); top: 50%; width: 14px; height: 14px; margin: -7px; border-radius: 50%; background: oklch(0.9 0.14 150); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .blob { animation: none; }
+    .lines, .line, .toast, .verdict { transition-property: opacity; }
+    .line.gap.on i { animation: none; }
+  }
+</style>
+</head>
+<body>
+<main class="stage empty" id="stage">
+  <div class="bg" id="bg"></div>
+
+  <section class="np">
+    <img class="art" id="art" alt="">
+    <div>
+      <div class="trow"><h1 class="title" id="title"></h1><span class="badges" id="badges"></span></div>
+      <p class="artist" id="artist"></p>
+      <p class="by" id="by"></p>
+    </div>
+  </section>
+
+  <section class="lyrics" id="lyrics"><div class="lines" id="lines"></div></section>
+  <div class="bigart"><img id="bigart" alt=""></div>
+
+  <section class="idle">
+    <h1>Pide tu canción en el chat</h1>
+    <p>Escribe el nombre y el artista. La pongo y reaccionamos juntos.</p>
+  </section>
+
+  <aside class="side">
+    <h2>A continuación <span class="num" id="count"></span></h2>
+    <ol class="q" id="queue"></ol>
+    <div class="top" id="top" hidden><h3>Top del directo</h3><ol id="topList"></ol></div>
+  </aside>
+
+  <div class="fin" id="fin" aria-hidden="true"><div class="tint"></div><div class="rays"></div></div>
+  <div class="finword" id="finword" aria-hidden="true"><b>+50</b><span>TEMAZO</span></div>
+  <div class="meter" id="meter" aria-hidden="true">
+    <div class="rail"><div class="grad" id="mgrad"></div><div class="ticks"></div><div class="mid"></div></div>
+    <div class="knob" id="mknob"><span><b id="mval">0</b><small id="mlab">Normal</small></span></div>
+    <div class="labels"><span>−50 · Basura</span><span>−25 · Flojo</span><span>0 · Normal</span><span>+25 · Buena</span><span>+50 · Temazo</span></div>
+  </div>
+  <div class="bar num"><span id="cur">0:00</span><div class="track"><div class="fill" id="fill"></div></div><span id="dur">0:00</span></div>
+
+  <div class="fx-flash" id="flash"></div>
+  <div class="bars" aria-hidden="true"><i></i><i></i></div>
+  <div class="toast" id="toast" role="status"></div>
+  <div class="verdict" id="verdict" aria-live="polite"></div>
+</main>
+
+<script type="module">
+import { subscribe, progressOf, fmt, esc, icon, avatar, flip } from '/live.js';
+
+const $ = id => document.getElementById(id);
+const stage = $('stage');
+let scale = 1;
+// Diseñado a 1920 de ancho; se escala y estira para llenar siempre la ventana entera, sin bandas
+const fit = () => {
+  scale = Math.min(innerWidth / 1920, innerHeight / 900);
+  stage.style.cssText = `--s:${scale};--w:${innerWidth / scale}px;--h:${innerHeight / scale}px`;
+};
+addEventListener('resize', fit); fit();
+
+let S = null, lyricsUri = null, queueSig = '', lastArt = null, active = -1, seenChat = new Set(), firstState = true;
+const LEAD = 250; // Spotify informa el progreso con algo de retraso
+
+const sse = subscribe(s => { S = s; render(); });
+
+function setBackground(url) {
+  if (url === lastArt) return;
+  lastArt = url;
+  const layer = document.createElement('div');
+  layer.className = 'bg-layer';
+  layer.innerHTML = url ? `<div class="blob a"><img src="${esc(url)}" alt=""></div><div class="blob b"><img src="${esc(url)}" alt=""></div>` : '';
+  $('bg').append(layer);
+  setTimeout(() => { while ($('bg').children.length > 1) $('bg').firstChild.remove(); }, 1600);
+}
+
+function render() {
+  const now = S.now;
+  stage.classList.toggle('empty', !now);
+  setBackground(now?.art || S.queue[0]?.art || null);
+
+  if (now && now.uri !== shownUri && !changing) changeTrack(now);
+  else if (now && !changing) { fillMeta(now); syncLyrics(true); }
+  showVerdict(S.verdict);
+  renderBadges();
+  renderMeter();
+  renderTop();
+
+  // cola: la que ya está en camino (bloqueada) + las que quepan
+  const items = [...(S.upNext ? [{ ...S.upNext, locked: true }] : []), ...S.queue];
+  const total = items.length, shown = Math.max(3, Math.floor(($('queue').clientHeight + 18) / 98) - (total > 1 ? 1 : 0));
+  $('count').textContent = total ? `${total} en cola` : '';
+  renderQueue(items, shown, total);
+
+  // las reglas van aparte, en Reglas.png (más grande y legible en el directo)
+
+  // el chat ya lo enseña TikTok; aquí solo saltan los avisos de regalos nuevos
+  for (const m of S.chat) {
+    if (seenChat.has(m.id)) continue;
+    seenChat.add(m.id);
+    if (!firstState && m.kind === 'gift') showToast(m);
+  }
+  firstState = false;
+}
+
+const E_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)', E_DRAWER = 'cubic-bezier(0.32, 0.72, 0, 1)';
+let shownUri = null, changing = false, coverOn = false;
+// espera a la portada nueva (sin parpadeo), pero nunca más de 1,5 s: con la pestaña oculta el navegador no termina de prepararla
+const preload = url => new Promise(r => { if (!url) return r(); setTimeout(r, 1500); const im = new Image(); im.referrerPolicy = 'no-referrer'; im.onload = im.onerror = () => (im.decode ? im.decode().catch(() => {}).then(r) : r()); im.src = url; });
+const fadeOut = (el, d = 260) => el.animate([{ opacity: 1, transform: 'none', filter: 'blur(0)' }, { opacity: 0, transform: 'translateY(-14px)', filter: 'blur(8px)' }], { duration: d, easing: E_OUT, fill: 'forwards' }).finished;
+const fadeIn = (el, delay = 0) => el.animate([{ opacity: 0, transform: 'translateY(18px)', filter: 'blur(10px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 620, delay, easing: E_OUT, fill: 'both' });
+
+function fillMeta(now) {
+  $('dur').textContent = fmt(now.durationMs);
+  const by = (now.user && now.user.id !== '__host' ? `${avatar(now.user, 40)}<span>pedida por <b>${esc(now.user.nick)}</b></span>` : '')
+    + (now.coins ? '<span class="locked-badge">Donada · se escucha entera</span>' : '');
+  if ($('by').dataset.html !== by) { $('by').dataset.html = by; $('by').innerHTML = by; }
+}
+
+// Cambio de canción: sale lo viejo, se precarga la portada nueva (sin parpadeo) y entra lo nuevo
+async function changeTrack(now) {
+  changing = true;
+  const first = shownUri === null;
+  shownUri = now.uri;
+  const ready = preload(now.art);
+  const np = document.querySelector('.np'), main = coverOn ? document.querySelector('.bigart') : $('lyrics');
+  if (!first) await Promise.all([fadeOut(np), fadeOut(main)]);
+  await ready;
+  $('art').src = now.art; $('bigart').src = now.art;
+  $('title').textContent = now.name; $('artist').textContent = now.artists;
+  fillMeta(S.now?.uri === now.uri ? S.now : now);
+  lyricsUri = null;
+  if (coverOn) { coverOn = false; stage.classList.remove('cover'); }
+  changing = false;
+  np.getAnimations().forEach(a => a.cancel()); main.getAnimations().forEach(a => a.cancel());
+  syncLyrics(false);
+  fadeIn(np);
+  if (!coverOn) fadeIn($('lyrics'), 80);
+  if (S.now && S.now.uri !== shownUri) changeTrack(S.now); // cambió otra vez mientras animábamos
+}
+
+// Letra o portada en grande. animate=false al entrar una canción (ya entra con su propio fundido)
+function syncLyrics(animate) {
+  const now = S.now; if (!now || changing) return;
+  const loaded = S.lyrics?.uri === now.uri;
+  const key = loaded ? now.uri : `loading:${now.uri}`;
+  const wantCover = loaded && !S.lyrics.lines.length;
+  if (key !== lyricsUri) {
+    lyricsUri = key; renderLyrics();
+    if (loaded && S.lyrics.lines.length) [...$('lines').children].slice(0, 9).forEach((el, k) =>
+      el.animate([{ translate: '0 22px', filter: 'blur(8px)', opacity: 0 }, { translate: '0 0', filter: 'blur(0)' }],
+        { duration: 620, delay: 60 + k * 45, easing: E_OUT, fill: 'backwards', composite: 'replace' }));
+  }
+  if (wantCover !== coverOn) setCover(wantCover, animate);
+}
+
+// La portada pequeña vuela y crece hasta la grande (y al revés), sin que se vean dos portadas
+function setCover(on, animate) {
+  coverOn = on;
+  const small = $('art'), big = $('bigart');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const rel = () => { const a = small.getBoundingClientRect(), b = big.getBoundingClientRect(); return { dx: (a.left - b.left) / scale, dy: (a.top - b.top) / scale, k: a.width / b.width }; };
+  big.getAnimations().forEach(a => a.cancel());
+  if (on) {
+    stage.classList.add('cover');
+    const { dx, dy, k } = rel();
+    if (reduce) return void fadeIn(document.querySelector('.bigart'));
+    big.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${k})`, borderRadius: `${18 / k}px` }, { transform: 'none', borderRadius: '30px' }], { duration: animate ? 860 : 980, easing: E_DRAWER });
+  } else {
+    if (!stage.classList.contains('cover')) return;
+    if (reduce) { stage.classList.remove('cover'); return; }
+    const { dx, dy, k } = rel();
+    big.animate([{ transform: 'none', borderRadius: '30px' }, { transform: `translate(${dx}px, ${dy}px) scale(${k})`, borderRadius: `${18 / k}px` }], { duration: 700, easing: E_DRAWER })
+      .finished.then(() => { if (!coverOn) { stage.classList.remove('cover'); fadeIn($('lyrics')); } }).catch(() => {});
+  }
+}
+
+// Cola sin parpadeos: cada canción reutiliza su fila (no se recargan portadas), las que suben se deslizan,
+// las nuevas entran y las que se van salen
+function renderQueue(items, shown, total) {
+  const ul = $('queue');
+  const rows = items.slice(0, shown).map((e, i) => ({ key: e.id, e, i }));
+  // las que no caben: sus portadas en fila y cuántas quedan
+  if (total > shown) rows.push({ key: 'more', rest: items.slice(shown), text: `+${total - shown}` });
+  if (!total) rows.push({ key: 'none', text: 'La cola está vacía' });
+  const sig = JSON.stringify(rows.map(r => [r.key, r.i, r.e?.coins, r.e?.locked, r.text, r.rest?.map(e => e.id)]));
+  if (sig === queueSig) return; queueSig = sig;
+  const before = new Map([...ul.children].filter(el => !el.dataset.gone).map(el => [el.dataset.key, { el, top: el.offsetTop }]));
+  const els = rows.map(r => {
+    let el = before.get(r.key)?.el;
+    if (!el) {
+      el = document.createElement('li'); el.dataset.key = r.key;
+      if (r.e) el.innerHTML = '<span class="pos num"></span><span class="cv"><img class="cover" alt=""><span class="who"></span></span><span class="t"><b></b><small></small></span><span class="c"></span>';
+    }
+    if (r.rest) {
+      el.className = 'rest';
+      const from = shown + 1, extra = r.rest.length - 6;
+      el.innerHTML = r.rest.slice(0, 6).map((e, k) => `<figure><img src="${esc(e.art)}" alt=""><figcaption class="num">${from + k}</figcaption></figure>`).join('') + (extra > 0 ? `<span class="num">+${extra}</span>` : '');
+      return el;
+    }
+    if (!r.e) { el.className = 'more'; el.textContent = r.text; return el; }
+    const e = r.e, img = el.querySelector('img.cover');
+    // foto de quien la pidió, encajada en la esquina (las que pones tú no llevan)
+    const whoKey = e.user.id === '__host' ? '' : e.user.id + (e.user.avatar || '');
+    const who = el.querySelector('.who');
+    if (who.dataset.k !== whoKey) { who.dataset.k = whoKey; who.innerHTML = whoKey ? avatar(e.user, 34) : ''; }
+    el.className = e.locked ? 'locked' : '';
+    el.querySelector('.pos').innerHTML = e.locked ? icon.play : r.i + 1;
+    if (img.getAttribute('src') !== e.art) img.src = e.art;
+    el.querySelector('b').textContent = e.name;
+    el.querySelector('small').textContent = `${e.artists} · ${e.user.nick}`;
+    const c = e.coins ? `<span class="coins num"><img src="/img/moneda.png" alt="">${e.coins}</span>` : '';
+    const slot = el.querySelector('.c'); if (slot.innerHTML !== c) slot.innerHTML = c;
+    return el;
+  });
+  const gone = [...before.values()].filter(b => !els.includes(b.el));
+  ul.replaceChildren(...els);
+  for (const g of gone) {
+    g.el.dataset.gone = '1';
+    g.el.style.cssText = `position:absolute;left:0;right:0;top:${g.top}px`;
+    ul.append(g.el);
+    g.el.animate([{ opacity: 1, transform: 'none', filter: 'blur(0)' }, { opacity: 0, transform: 'translateX(-30px) scale(.97)', filter: 'blur(5px)' }], { duration: 380, easing: E_OUT, fill: 'forwards' })
+      .finished.then(() => g.el.remove());
+  }
+  els.forEach((el, k) => {
+    const b = before.get(el.dataset.key);
+    if (b) { const dy = b.top - el.offsetTop; if (Math.abs(dy) > 1) el.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 600, easing: E_DRAWER }); }
+    else el.animate([{ opacity: 0, transform: 'translateY(16px) scale(.97)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 520, delay: 140 + k * 40, easing: E_OUT, fill: 'backwards' });
+  });
+}
+
+// Insignias junto al título: aprobada (tick bailando), corazón (guardada), cuenta atrás o salvada.
+// Cada una entra con un muelle suave y sale encogiendo; nunca se repinta si no cambia.
+const ICON_HEART = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.6 3.9 4.5 7.2 4.5c2 0 3.6 1.1 4.8 2.8 1.2-1.7 2.8-2.8 4.8-2.8 3.3 0 5.6 3.1 4.4 6.6-1.7 4.8-9.2 9.4-9.2 9.4Z"/></svg>';
+const ICON_SHIELD = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5.5c0 4.2 3 7.8 7 9.5 4-1.7 7-5.3 7-9.5V6l-7-3Z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg>';
+const ICON_MEH = '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6.5 12h11"/></svg>';
+let badgeSig = '', countEl = null, morphTarget = null;
+function renderBadges() {
+  const j = S.judge?.uri === S.now?.uri && !changing ? S.judge : null;
+  const want = [];
+  if (j?.kind === 'liked') want.push('ok');
+  if (j?.kind === 'meh') want.push('meh');
+  if (j?.kind === 'saved') want.push('saved');
+  if (j?.kind === 'pending' || j?.kind === 'skipped') want.push('count');
+  if (j?.loved) want.push('love');
+  const sig = want.join() + (j?.until || '');
+  if (sig === badgeSig) return; badgeSig = sig;
+  const box = $('badges');
+  const have = new Map([...box.children].filter(el => !el.dataset.gone).map(el => [el.dataset.k, el]));
+  for (const [k, el] of have) if (!want.includes(k)) {
+    el.dataset.gone = '1';
+    el.animate([{ opacity: 1, scale: 1 }, { opacity: 0, scale: 0.6, filter: 'blur(4px)' }], { duration: 260, easing: E_OUT, fill: 'forwards' }).finished.then(() => el.remove());
+  }
+  for (const k of want) {
+    let el = have.get(k);
+    if (!el) {
+      el = document.createElement('span'); el.dataset.k = k; el.className = `badge ${k}`;
+      el.innerHTML = k === 'ok' ? icon.check : k === 'meh' ? ICON_MEH : k === 'love' ? ICON_HEART : k === 'saved' ? `${ICON_SHIELD}Salvada`
+        : '<svg class="ring" viewBox="0 0 74 74"><circle class="track" cx="37" cy="37" r="33"/><circle class="left" cx="37" cy="37" r="33"/></svg><b class="num">15</b>';
+      box.append(el);
+      if (morphTarget === k) { el.style.opacity = '0'; continue; }
+      el.animate([{ opacity: 0, scale: 0.85, filter: 'blur(6px)' }, { opacity: 1, scale: 1, filter: 'blur(0)' }], { duration: 520, easing: 'cubic-bezier(0.65, 0, 0.35, 1)' }); // sin rebote
+    }
+  }
+  for (const k of want) { const el = box.querySelector(`[data-k="${k}"]:not([data-gone])`); if (k === 'count' && el) { countEl = el; countEl.dataset.until = j.until; } }
+  if (!want.includes('count')) countEl = null;
+}
+// el contador se mueve cada frame (anillo) y el número cambia cada segundo
+const RING = 2 * Math.PI * 33;
+function tickCount() {
+  if (!countEl) return;
+  const left = Math.min(15000, Math.max(0, +countEl.dataset.until - Date.now())); // empieza en 15 al aterrizar el sello
+  countEl.querySelector('.left').style.strokeDasharray = `${RING * left / 15000} ${RING}`;
+  const n = String(Math.ceil(left / 1000));
+  const b = countEl.querySelector('b');
+  if (b.textContent !== n) { b.textContent = n; b.animate([{ opacity: .4 }, { opacity: 1 }], { duration: 300, easing: E_OUT }); }
+  countEl.classList.toggle('hurry', left < 5000);
+}
+
+// Top del directo: quién lleva más puntos en este directo (sube y baja deslizándose)
+let topSig = '';
+function renderTop() {
+  const top = S.settings?.showTop === false ? [] : (S.points?.top || []).slice(0, 3); // se puede apagar en Ajustes
+  const sig = JSON.stringify(top.map(t => [t.id, t.pts]));
+  if (sig === topSig) return; topSig = sig;
+  $('top').hidden = !top.length;
+  flip($('topList'), () => {
+    $('topList').innerHTML = top.map((t, i) => `<li data-key="${esc(t.id)}"><span class="n">${i + 1}</span>${avatar({ id: t.id, nick: t.nick, avatar: t.avatar }, 44)}<b>${esc(t.nick)}</b><span class="p">${t.pts}</span></li>`).join('');
+  }, scale);
+}
+
+// Medidor: la pastilla se desliza al valor y el color se enciende desde el centro hasta él
+const MCOL = v => v <= -25 ? 'oklch(0.66 0.2 25)' : v < -5 ? 'oklch(0.76 0.15 55)' : v <= 5 ? 'oklch(0.88 0.12 90)' : v < 25 ? 'oklch(0.8 0.15 135)' : 'oklch(0.74 0.17 155)';
+const MLAB = v => v <= -35 ? 'Basura' : v <= -15 ? 'Flojo' : v < 15 ? 'Normal' : v < 35 ? 'Buena' : 'Temazo';
+let meterSig = '', lastMeter = 0, settleTimer;
+// color de la portada: media de los píxeles con más color (si la imagen no deja leerse, rosa)
+const artColors = new Map();
+function artColor(url) {
+  if (artColors.has(url)) return Promise.resolve(artColors.get(url));
+  return new Promise(ok => {
+    const im = new Image(); im.crossOrigin = 'anonymous';
+    im.onload = () => {
+      try {
+        const c = document.createElement('canvas'); c.width = c.height = 24; const g = c.getContext('2d', { willReadFrequently: true });
+        g.drawImage(im, 0, 0, 24, 24); const d = g.getImageData(0, 0, 24, 24).data;
+        let r = 0, gg = 0, b = 0, w = 0;
+        for (let k = 0; k < d.length; k += 4) { const mx = Math.max(d[k], d[k + 1], d[k + 2]), mn = Math.min(d[k], d[k + 1], d[k + 2]), sat = (mx - mn) / 255 + 0.05; r += d[k] * sat; gg += d[k + 1] * sat; b += d[k + 2] * sat; w += sat; }
+        const col = `rgb(${Math.round(r / w)} ${Math.round(gg / w)} ${Math.round(b / w)})`;
+        artColors.set(url, col); ok(col);
+      } catch { ok('oklch(0.68 0.2 12)'); }
+    };
+    im.onerror = () => ok('oklch(0.68 0.2 12)');
+    im.src = url;
+  });
+}
+function renderMeter() {
+  const sc = S.score?.uri === S.now?.uri && S.score?.set ? S.score : null;
+  const sig = sc ? String(sc.value) : 'off';
+  if (sig === meterSig) return; meterSig = sig;
+  const m = $('meter');
+  if (!sc) { m.classList.remove('on'); clearTimeout(settleTimer); return; }
+  const wasOff = !m.classList.contains('on');
+  m.classList.add('on');
+  if (wasOff) m.animate([{ opacity: 0, transform: 'translateY(12px)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 520, easing: E_OUT });
+  const v = sc.value, pct = (v + 50); // 0..100
+  // al dejar de moverlo medio segundo, el número sale en grande encima de la pastilla (en +50, momento Finalista)
+  clearTimeout(settleTimer);
+  if (!wasOff) settleTimer = setTimeout(() => v === 50 ? finalist() : bigNumber(v, MCOL(v)), 500);
+  lastMeter = v;
+  $('mknob').style.setProperty('--p', `${pct}%`);
+  $('mgrad').style.clipPath = v >= 0 ? `inset(0 ${100 - pct}% 0 50%)` : `inset(0 50% 0 ${pct}%)`;
+  $('mknob').style.setProperty('--kc', MCOL(v));
+  $('mval').textContent = (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v);
+  $('mlab').textContent = MLAB(v);
+}
+
+// número grande encima de la pastilla: sube, se queda un momento y se va
+function bigNumber(v, color, dur = 1600) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const word = $('finword');
+  word.querySelector('b').textContent = (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v);
+  word.querySelector('span').textContent = MLAB(v).toUpperCase();
+  word.style.setProperty('--wc', color);
+  const st = stage.getBoundingClientRect(), k = $('mknob').firstElementChild.getBoundingClientRect();
+  const W = st.width / scale, ww = word.offsetWidth, wh = word.offsetHeight;
+  const cx = (k.left + k.width / 2 - st.left) / scale, top = (k.top - st.top) / scale - wh - 14;
+  word.style.left = `${Math.max(24, Math.min(W - ww - 24, cx - ww / 2))}px`; word.style.top = `${top}px`;
+  word.getAnimations().forEach(a => a.cancel());
+  word.animate([
+    { opacity: 0, transform: 'translateY(14px) scale(.95)', filter: 'blur(6px)' },
+    { opacity: 1, transform: 'translateY(0) scale(1)', filter: 'blur(0)', offset: 0.22 },
+    { opacity: 1, transform: 'translateY(-4px) scale(1)', filter: 'blur(0)', offset: 0.75 },
+    { opacity: 0, transform: 'translateY(-14px)', filter: 'blur(6px)' }
+  ], { duration: dur, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+}
+async function finalist() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const col = await artColor(S.now?.art || '');
+  stage.style.setProperty('--fc', col);
+  const fin = $('fin');
+  fin.classList.add('run');
+  fin.querySelector('.tint').animate([{ opacity: 0 }, { opacity: 0.7, offset: 0.12 }, { opacity: 0.5, offset: 0.6 }, { opacity: 0 }], { duration: 2600, easing: 'ease' });
+  fin.querySelector('.rays').animate([{ opacity: 0, transform: 'scale(.9) rotate(0deg)' }, { opacity: 0.32, offset: 0.2 }, { opacity: 0, transform: 'scale(1.25) rotate(5deg)' }],
+    { duration: 1500, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' }).finished.then(() => fin.classList.remove('run'));
+  bigNumber(50, col, 2600);
+}
+
+// Sello del veredicto sobre la letra
+let verdictAt = 0, verdictTimer;
+function showVerdict(v) {
+  if (!v || v.at === verdictAt) return;
+  const fresh = verdictAt !== 0 || Date.now() - v.at < 3000;
+  verdictAt = v.at;
+  if (!fresh) return;
+  if (v.v !== 'love') playVerdict(v.v);
+}
+
+// Secuencia: velo → círculo que piensa → se estira en pastilla → color desde el centro → icono y palabra
+let vrun = 0;
+function playVerdict(kind) {
+  const run = ++vrun; // si entra otro veredicto, los temporizadores de este se retiran
+  const like = kind === 'like', save = kind === 'save';
+  const SUS = save ? 0 : 1450, OUT = save ? 1900 : 3700; // «Salvada» sale directa, sin suspense
+  morphTarget = { like: 'ok', meh: 'meh', skip: 'count', save: 'saved' }[kind];
+  // si la insignia ya estaba arriba, se esconde: la va a ocupar este sello al llegar
+  const prev = document.querySelector(`#badges [data-k="${morphTarget}"]:not([data-gone])`);
+  if (prev) prev.style.opacity = '0';
+  const el = $('verdict');
+  const word = like ? 'Aprobada' : save ? 'Salvada' : kind === 'meh' ? 'Meh' : 'Saltada';
+  el.className = `verdict run ${kind}`;
+  el.innerHTML = `
+    <div class="v-core"><div class="v-fill"></div><div class="v-ring"></div><span class="v-q">?</span>
+      <svg class="v-icon" viewBox="0 0 24 24"><path d="${like || save ? 'm5 12.5 4.5 4.5L19 7.5' : kind === 'meh' ? 'M5.5 12h13' : 'M6.5 6.5l11 11M17.5 6.5l-11 11'}"/></svg>
+      <span class="v-word">${[...word].map(c => `<i>${c}</i>`).join('')}</span></div>`;
+  const q = s => el.querySelector(s);
+  const core = q('.v-core'), E = 'cubic-bezier(0.23, 1, 0.32, 1)', SPRING = 'cubic-bezier(0.34, 1.45, 0.64, 1)';
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const T = reduce ? 0.01 : 1;
+
+
+  // 1. suspense: entra el círculo, el anillo gira y late
+  core.animate([{ opacity: 0, transform: 'scale(.6)', filter: 'blur(10px)' }, { opacity: 1, transform: 'scale(1)', filter: 'blur(0)' }], { duration: 500 * T, easing: SPRING, fill: 'forwards' });
+  q('.v-ring').animate([{ transform: 'rotate(0)' }, { transform: 'rotate(2.5turn)' }], { duration: 1500 * T, easing: 'cubic-bezier(0.5, 0, 0.2, 1)', fill: 'forwards' });
+  q('.v-q').animate([{ transform: 'scale(1)' }, { transform: 'scale(1.18)' }, { transform: 'scale(1)' }, { transform: 'scale(1.25)' }, { transform: 'scale(1)' }], { duration: 1400 * T });
+
+  // 2. revelación
+  setTimeout(() => {
+    if (run !== vrun) return;
+    q('.v-ring').animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, fill: 'forwards' });
+    q('.v-q').remove();
+    q('.v-icon').style.display = 'block'; q('.v-word').style.display = 'block';
+    const w = q('.v-word').offsetWidth + 96 + 26 + 120;
+    core.animate([{ width: '150px', marginLeft: '-75px' }, { width: `${w}px`, marginLeft: `${-w / 2}px` }], { duration: 650 * T, easing: SPRING, fill: 'forwards' });
+    q('.v-fill').animate([{ clipPath: 'circle(0% at 50% 50%)' }, { clipPath: 'circle(75% at 50% 50%)' }], { duration: 520 * T, easing: E, fill: 'forwards' });
+    q('.v-icon path').animate([{ strokeDashoffset: 40 }, { strokeDashoffset: 0 }], { duration: 420 * T, delay: 220 * T, easing: E, fill: 'forwards' });
+    el.querySelectorAll('.v-word i').forEach((c, k) => c.animate(
+      [{ opacity: 0, transform: 'translateY(30px)', filter: 'blur(8px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }],
+      { duration: 420 * T, delay: (260 + k * 38) * T, easing: E, fill: 'forwards' }));
+    if (!reduce && (like || save)) for (let k = 0; k < 22; k++) {
+      const a = Math.random() * Math.PI * 2, d = 260 + Math.random() * 380;
+      const s = document.createElement('i'); s.className = 'v-spark'; el.append(s);
+      s.animate([{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: `translate(${Math.cos(a) * d}px, ${Math.sin(a) * d * .6}px) scale(0)`, opacity: 0 }],
+        { duration: 900 + Math.random() * 500, delay: 200, easing: E, fill: 'forwards' });
+    }
+    if (!reduce && kind === 'skip') stage.animate([0, 10, -9, 7, -5, 3, 0].map(x => ({ translate: `${x}px 0` })), { duration: 480, delay: 240 });
+  }, SUS * T);
+
+  // 3. salida
+  clearTimeout(verdictTimer);
+  verdictTimer = setTimeout(() => {
+    if (run !== vrun) return;
+    const target = document.querySelector(`#badges [data-k="${morphTarget}"]:not([data-gone])`);
+    const done = () => { if (run !== vrun) return; el.className = 'verdict'; el.innerHTML = ''; morphTarget = null; };
+    if (!target || reduce) {
+      if (target) target.style.opacity = '';
+      core.animate([{ opacity: 1, transform: 'scale(1)', filter: 'blur(0)' }, { opacity: 0, transform: 'translateY(-40px) scale(.94)', filter: 'blur(10px)' }], { duration: 320, easing: E, fill: 'forwards' }).finished.then(done);
+      return;
+    }
+    // Dos tiempos, sin deformar nunca la forma:
+    // 1) la pastilla se recoge en su sitio hasta ser un círculo (la palabra se va, el icono se centra);
+    // 2) ese círculo vuela a la insignia encogiéndose con escala uniforme (sigue redondo) y llega siendo ella.
+    const st = stage.getBoundingClientRect();
+    const loc = r => ({ x: (r.left + r.width / 2 - st.left) / scale, y: (r.top + r.height / 2 - st.top) / scale, w: r.width / scale, h: r.height / scale });
+    const A = loc(core.getBoundingClientRect()), B = loc(target.getBoundingClientRect());
+    const word = core.querySelector('.v-word'), ico = core.querySelector('.v-icon');
+    const COLLAPSE = 380, FLY = 560;
+
+    // 1) recoger: la palabra sale con desenfoque; el icono se desliza al centro (FLIP) mientras el ancho baja a un círculo
+    word.animate([{ opacity: 1, filter: 'blur(0)' }, { opacity: 0, filter: 'blur(6px)' }], { duration: 180, easing: E, fill: 'forwards' });
+    setTimeout(() => {
+      if (run !== vrun) return;
+      const before = ico.getBoundingClientRect().left;
+      word.style.display = 'none';
+      const shift = (before - ico.getBoundingClientRect().left) / scale;
+      ico.animate([{ transform: `translateX(${shift}px)` }, { transform: 'none' }], { duration: COLLAPSE, easing: E_DRAWER });
+      core.getAnimations().forEach(x => { x.commitStyles?.(); x.cancel(); });
+      core.animate([{ width: `${A.w}px`, marginLeft: `${-A.w / 2}px` }, { width: `${A.h}px`, marginLeft: `${-A.h / 2}px` }], { duration: COLLAPSE, easing: E_DRAWER, fill: 'forwards' });
+
+      // 2) volar: una copia exacta de la insignia, del tamaño final, se coloca encima del círculo escalada
+      // y vestida con el color del sello; viaja a su sitio con escala uniforme y el color del sello se retira
+      setTimeout(() => {
+        if (run !== vrun) return;
+        const k = A.h / B.w;
+        const morph = target.cloneNode(true);
+        morph.removeAttribute('data-k');
+        morph.style.cssText = `position:absolute;left:${B.x - B.w / 2}px;top:${B.y - B.h / 2}px;width:${B.w}px;height:${B.h}px;margin:0;opacity:1;transition:none;transform-origin:50% 50%`;
+        const skin = document.createElement('span');
+        skin.style.cssText = `position:absolute;inset:0;border-radius:inherit;background:${getComputedStyle(core.querySelector('.v-fill')).backgroundImage}`;
+        const inside = [...morph.children];
+        morph.prepend(skin);
+        el.append(morph);
+        core.style.visibility = 'hidden';
+        const from = `translate(${A.x - B.x}px, ${A.y - B.y}px) scale(${k})`;
+        morph.animate([{ transform: from, boxShadow: getComputedStyle(core).boxShadow }, { transform: 'none', boxShadow: getComputedStyle(target).boxShadow }], { duration: FLY, easing: E_DRAWER, fill: 'forwards' });
+        skin.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FLY * 0.85, easing: 'ease', fill: 'forwards' });
+        inside.forEach(n => n.animate([{ opacity: 0, filter: 'blur(3px)' }, { opacity: 1, filter: 'blur(0)' }], { duration: FLY * 0.6, delay: FLY * 0.2, easing: E, fill: 'both' }));
+        setTimeout(() => {
+          if (run !== vrun) return;
+          target.style.transition = 'none'; target.style.opacity = ''; // misma imagen, mismo sitio: el cambio no se ve
+          morph.remove();
+          done();
+        }, FLY);
+      }, COLLAPSE);
+    }, 180);
+  }, OUT * T);
+}
+
+// Donaciones: una isla negra arriba en el centro que se expande, enseña quién y qué, y se recoge. En fila si llegan varias.
+const pending = [];
+let alerting = false;
+function showToast(m) { if (S.settings?.showAlerts === false) return; pending.push(m); if (!alerting) nextAlert(); } // se puede apagar en Ajustes
+async function nextAlert() {
+  const m = pending.shift();
+  if (!m) { alerting = false; return; }
+  alerting = true;
+  // la foto se carga antes de abrir la isla (máx. 0,8 s), para que no aparezca de golpe
+  if (m.user.avatar) await Promise.race([preload(m.user.avatar), new Promise(r => setTimeout(r, 800))]);
+  const what = !m.moved ? 'guarda el saldo para su canción' : m.to === 0 ? 'su canción es la siguiente' : `su canción sube al puesto ${m.to + 1}`;
+  const t = $('toast');
+  t.innerHTML = `<div class="in">${avatar(m.user, 86)}<div class="txt"><div class="who"><span>${esc(m.user.nick)}</span><span class="amt num"><img src="/img/moneda.png" alt="">${m.coins} ${m.coins === 1 ? 'moneda' : 'monedas'}</span></div>
+    <div class="gift">Ha donado ${m.image ? `<img class="gimg" src="${esc(m.image)}" alt="">` : ''}<b>${esc(m.text)}</b> · ${what}</div></div></div>`;
+  const inner = t.firstChild;
+  const w = Math.min(1100, inner.scrollWidth), h = 138;
+  const SPRING = 'cubic-bezier(0.32, 1.25, 0.5, 1)', E = 'cubic-bezier(0.23, 1, 0.32, 1)';
+  const pill = { width: '230px', height: '64px', marginLeft: '-115px' };
+  const open = { width: `${w}px`, height: `${h}px`, marginLeft: `${-w / 2}px` };
+  stage.classList.add('alerting');
+  t.animate([{ opacity: 0, transform: 'scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: E, fill: 'forwards' });
+  t.animate([pill, open], { duration: 640, delay: 140, easing: SPRING, fill: 'forwards' });
+  inner.animate([{ opacity: 0, filter: 'blur(6px)', transform: 'scale(.96)' }, { opacity: 1, filter: 'none', transform: 'none' }], { duration: 380, delay: 380, easing: E, fill: 'forwards' });
+  setTimeout(() => {
+    inner.animate([{ opacity: 1 }, { opacity: 0, filter: 'blur(4px)' }], { duration: 180, fill: 'forwards' });
+    t.animate([open, pill], { duration: 420, delay: 120, easing: E, fill: 'forwards' });
+    t.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, delay: 520, fill: 'forwards' }).finished.then(() => { if (!pending.length) stage.classList.remove('alerting'); setTimeout(nextAlert, 250); });
+  }, 4600);
+}
+
+function renderLyrics() {
+  const now = S.now, L = S.lyrics, box = $('lines');
+  active = -1; box.style.transform = '';
+  box.classList.toggle('plain', !!L && !L.synced);
+  $('lyrics').querySelector('.note')?.remove();
+  if (!now || L?.uri !== now.uri) { box.innerHTML = ''; return; }
+  if (!L.lines.length) { box.innerHTML = ''; return; }
+  box.innerHTML = L.lines.map(l => l.text
+    ? `<p class="line">${esc(l.text)}</p>`
+    : `<p class="line gap" aria-hidden="true"><i></i><i></i><i></i></p>`).join('');
+}
+
+// bucle de animación: progreso y línea activa
+// M: volver al menú de inicio (sin botón visible: esta pantalla sale en el directo)
+addEventListener('keydown', e => { if (e.key.toLowerCase() === 'm' && !e.ctrlKey && !e.metaKey && !e.altKey) location.href = '/'; });
+addEventListener('wheel', e => {
+  if (!S?.lyrics || S.lyrics.synced) return;
+  fetch('/api/scroll', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delta: e.deltaY / scale * 0.6 }) });
+}, { passive: true });
+
+// ---------- ritmo: el detector corre en el panel de control y los golpes llegan por el servidor ----------
+let last = 0, dropUntil = 0, seenDrop = 0, env = 0, pulse = 0, cineMix = 0;
+const ema = (v, x, dt, tau) => v + (x - v) * (1 - Math.exp(-dt / tau));
+sse.addEventListener('beat', e => {
+  const b = JSON.parse(e.data);
+  if (b.k === 'drop') dropUntil = performance.now() + 6000;
+  else env = Math.max(env, b.s);
+});
+
+function beat(t) {
+  const dt = Math.min(100, t - last || 16); last = t;
+  if (S?.fx?.drop && S.fx.drop !== seenDrop) { if (seenDrop) { dropUntil = t + 6000; env = 1.1; } seenDrop = S.fx.drop; }
+  const cine = !!S?.fx?.cinema || t < dropUntil;
+  stage.classList.toggle('cine', cine);
+  // envolventes suaves: el golpe sube en ~35 ms y cae en ~200 ms; el modo cine entra y sale en ~1 s
+  env *= Math.exp(-dt / 200);
+  pulse = ema(pulse, env, dt, 35);
+  cineMix = ema(cineMix, cine ? 1 : 0, dt, 450);
+  const c = cineMix * cineMix * (3 - 2 * cineMix); // ease-in-out
+  const amp = 1 + 1.3 * c;
+  const drift = c * (0.035 + Math.sin(t / 2600) * 0.02); // empuje de cámara lento
+  const sway = c * pulse * Math.sin(t / 61) * Math.sin(t / 97) * 1.1; // balanceo suave, no temblor aleatorio
+  // solo se mueve el fondo: la letra, la cola y las portadas quedan quietas
+  $('bg').style.transform = `scale(${1 + drift + 0.04 * pulse * amp}) rotate(${sway}deg)`;
+  $('flash').style.opacity = Math.min(1, pulse * (0.4 + 0.45 * c));
+  $('art').style.scale = 1 + 0.05 * pulse * amp;
+  $('bigart').style.scale = 1 + 0.025 * pulse * amp;
+}
+
+function frame(t) {
+  requestAnimationFrame(frame);
+  tickCount();
+  beat(t || 0);
+  const now = S?.now;
+  if (!now) return;
+  const p = progressOf(now);
+  $('fill').style.transform = `scaleX(${p / now.durationMs})`;
+  $('cur').textContent = fmt(p);
+
+  const L = S.lyrics, box = $('lines');
+  if (!L?.lines.length || L.uri !== now.uri || lyricsUri !== now.uri) return;
+  if (!L.synced) {
+    // sin sincronizar: la letra se queda quieta y la mueves tú (rueda aquí o flechas en el panel)
+    const max = Math.max(0, box.scrollHeight - $('lyrics').clientHeight * 0.6);
+    box.style.transform = `translateY(${-Math.min(max, S.scroll || 0)}px)`;
+    return;
+  }
+  let i = -1;
+  const pl = p + LEAD + (S.offset || 0);
+  for (let k = 0; k < L.lines.length; k++) { if (L.lines[k].t <= pl) i = k; else break; }
+  if (i === active) return;
+  active = i;
+  [...box.children].forEach((el, k) => {
+    el.classList.toggle('on', k === i);
+    el.classList.toggle('past', k < i);
+    const d = Math.abs(k - i);
+    el.style.filter = d > 1 ? `blur(${Math.min(d - 1, 3) * 1.2}px)` : '';
+  });
+  const el = box.children[Math.max(i, 0)];
+  if (!el) { active = -1; return; } // la letra nueva aún no está pintada (cambio de canción en curso)
+  box.style.transform = `translateY(${-(el.offsetTop - 40) + $('lyrics').clientHeight * 0.2}px)`;
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

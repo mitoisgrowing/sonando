@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sonando · Control</title>
+<link rel="stylesheet" href="/base.css">
+<style>
+  html, body { height: 100%; }
+  body { display: grid; grid-template-rows: auto 1fr; font-size: 14.5px; background: #0d0c0e; overflow: hidden; }
+
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 0; background: none; }
+  :focus-visible { outline: 2px solid var(--rose); outline-offset: 2px; border-radius: 8px; }
+  input {
+    width: 100%; height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--fill); transition: border-color 150ms ease, background-color 150ms ease; caret-color: var(--rose);
+  }
+  input::placeholder { color: var(--ink-3); }
+  input:focus { outline: none; border-color: color-mix(in oklch, var(--rose) 60%, transparent); background: var(--fill-2); }
+  .btn {
+    height: 38px; padding: 0 14px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    background: var(--fill-2); font-weight: 600; white-space: nowrap; transition: transform 140ms var(--ease-out), background-color 150ms ease;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn.primary { background: var(--ink); color: #111; }
+  .btn.rose { background: color-mix(in oklch, var(--rose) 26%, transparent); color: var(--rose-ink); }
+  .btn.icon { width: 34px; height: 34px; padding: 0; border-radius: 9px; background: none; color: var(--ink-3); }
+  .btn:disabled { opacity: .4; cursor: default; transform: none; }
+  @media (hover: hover) {
+    .btn:hover { background: rgb(255 255 255 / .16); }
+    .btn.primary:hover { background: #fff; }
+    .btn.icon:hover { color: var(--ink); background: var(--fill-2); }
+  }
+
+  /* Barra superior */
+  .top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 20px; padding: 14px 24px; border-bottom: 1px solid var(--line); }
+  .brand { font-size: 18px; font-weight: 760; letter-spacing: -0.03em; display: flex; align-items: center; gap: 10px; }
+  .pills { display: flex; gap: 6px; padding: 4px; border-radius: 99px; background: var(--fill); }
+  .pill { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; border-radius: 99px; color: var(--ink-2); font-size: 13px; font-weight: 600;
+    max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background-color 150ms ease, color 150ms ease; }
+  .pill span:last-child { overflow: hidden; text-overflow: ellipsis; }
+  .pill[hidden] { display: none; }
+  @media (hover: hover) { .pill:hover { background: var(--fill-2); color: var(--ink); } }
+  /* ventanita bajo cada pastilla: nace desde la pastilla (origen arriba), rápida y sin rebote */
+  .pop { position: fixed; z-index: 30; width: 320px; padding: 16px; border-radius: 16px; background: #1a191c; display: grid; gap: 10px;
+    box-shadow: 0 24px 60px -16px rgb(0 0 0 / .7), inset 0 0 0 1px var(--line); transform-origin: var(--ox, 50%) 0;
+    transition: opacity 160ms ease, transform 180ms var(--ease-out); }
+  .pop[hidden] { display: grid; visibility: hidden; opacity: 0; transform: translateY(-4px) scale(.97); pointer-events: none; }
+  .pop h4 { font-size: 13.5px; font-weight: 700; }
+  .pop p { color: var(--ink-2); font-size: 13px; line-height: 1.45; }
+  .pop .row { display: flex; gap: 8px; }
+  .acts { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+  .btn.ghost { background: none; color: var(--ink-2); text-decoration: none; }
+  #devBtn[aria-pressed="true"] { background: color-mix(in oklch, var(--warn) 22%, transparent); color: oklch(0.92 0.08 75); }
+  .brand svg { color: var(--rose); font-size: 20px; }
+  .conn { display: flex; align-items: center; gap: 8px; }
+  .conn input { width: 180px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); flex: none; }
+  .dot.on, .dot.ok { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in oklch, var(--ok) 22%, transparent); }
+  .dot.connecting { background: var(--warn); }
+  .status { color: var(--ink-2); font-size: 13px; }
+  .err { color: oklch(0.78 0.14 25); font-size: 13px; }
+  a.link { color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--ink-3); }
+
+  /* Tres columnas */
+  .cols { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(340px, 1.1fr) minmax(320px, 1fr); min-height: 0; }
+  .col { display: grid; grid-template-rows: auto 1fr auto; min-height: 0; border-right: 1px solid var(--line); }
+  .col:last-child { border-right: 0; }
+  .col > header { padding: 22px 24px 14px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .col h2 { font-size: 16px; font-weight: 700; letter-spacing: -0.015em; }
+  .col h2 + span { color: var(--ink-3); font-size: 13px; }
+  .scroll { overflow: auto; min-height: 0; padding: 0 14px 20px; scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / .14) transparent; }
+
+  .av { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; flex: none; }
+
+  /* Chat */
+  .msg { display: grid; grid-template-columns: 32px 1fr auto; gap: 10px; align-items: start; padding: 8px; border-radius: 12px;
+    text-align: left; width: 100%; transition: background-color 150ms ease; }
+  .msg b { font-size: 12.5px; font-weight: 600; color: var(--ink-3); display: block; }
+  .msg .pts { font-style: normal; margin-left: 8px; padding: 1px 7px; border-radius: 99px; background: var(--fill-2); color: var(--ink-2); font-size: 11.5px; }
+  .msg p { line-height: 1.4; overflow-wrap: anywhere; }
+  .msg .copy { opacity: 0; transition: opacity 150ms ease; }
+  .msg.gift p { color: var(--rose-ink); font-weight: 600; display: flex; gap: 6px; align-items: center; }
+  .msg.gift p svg { color: var(--rose); }
+  .msg.gift .gimg { width: 26px; height: 26px; object-fit: contain; flex: none; }
+  .msg.picked { background: color-mix(in oklch, var(--rose) 14%, transparent); }
+  @media (hover: hover) { .msg:hover { background: var(--fill); } .msg:hover .copy { opacity: 1; } }
+  .msg .copy:focus-visible { opacity: 1; }
+  .empty { color: var(--ink-3); padding: 24px 8px; line-height: 1.5; }
+  .sim { border-top: 1px solid var(--line); padding: 14px 20px 16px; background: color-mix(in oklch, var(--warn) 6%, transparent); }
+  .sim h3 { font-size: 13px; font-weight: 700; display: flex; justify-content: space-between; }
+  .sim h3 span { color: var(--warn); font-weight: 600; }
+  .sim .row { display: grid; grid-template-columns: 120px 1fr; gap: 8px; margin-top: 10px; }
+  .sim .acts { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .gifts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+  .gifts .btn { height: auto; padding: 8px 6px; flex-direction: column; gap: 2px; font-size: 12.5px; }
+  .gifts .btn small { color: var(--ink-3); font-weight: 600; font-size: 11.5px; }
+  .cnt { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 13px; }
+  .cnt input { width: 76px; height: 34px; }
+  #devBtn[aria-pressed="true"] { background: color-mix(in oklch, var(--warn) 30%, transparent); color: oklch(0.92 0.08 75); }
+
+  /* Búsqueda */
+  /* columna del medio: buscador fijo arriba y los resultados con su propio scroll */
+  #mid { display: grid; grid-template-rows: auto auto minmax(0, 1fr); min-height: 0; overflow: hidden; }
+  .searchbar { padding: 0 20px 12px; display: grid; gap: 10px; }
+  .field { position: relative; }
+  .field svg { position: absolute; left: 12px; top: 11px; color: var(--ink-3); font-size: 16px; }
+  .field input { padding-left: 36px; height: 44px; font-size: 15px; }
+  .for { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 13px; min-height: 24px; }
+  .for .av { width: 22px; height: 22px; font-size: 10px; }
+  .for b { color: var(--ink); }
+  .res { display: grid; grid-template-columns: 52px 1fr auto; gap: 12px; align-items: center; padding: 8px; border-radius: 12px;
+    transition: background-color 150ms ease; }
+  @media (hover: hover) { .res:hover { background: var(--fill); } }
+  .res.alb { width: 100%; text-align: left; }
+  .reshead { font-size: 12.5px; font-weight: 700; color: var(--ink-3); margin: 18px 8px 6px; letter-spacing: .02em; }
+  .albhead { display: grid; grid-template-columns: auto 64px 1fr auto; gap: 12px; align-items: center; padding: 4px 8px 14px; margin-bottom: 6px; border-bottom: 1px solid var(--line); }
+  .albhead img { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; }
+  .albhead b { display: block; font-weight: 700; } .albhead small { color: var(--ink-2); font-size: 12.5px; }
+  .albhead [data-back] svg { transform: rotate(-90deg); }
+  .res img, .row-q img { width: 52px; height: 52px; border-radius: 9px; object-fit: cover; background: var(--fill-2); }
+  .res b, .row-q b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; }
+  .res small, .row-q small { display: block; color: var(--ink-2); font-size: 12.5px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .res > span, .row-q > span { min-width: 0; }
+  .note { margin: 0 20px 12px; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.45; }
+  .note.bad { background: color-mix(in oklch, oklch(0.65 0.18 25) 18%, transparent); color: oklch(0.86 0.08 25); }
+  .note.good { background: color-mix(in oklch, var(--ok) 15%, transparent); color: oklch(0.9 0.07 150); }
+  .setup { padding: 4px 20px 20px; line-height: 1.55; color: var(--ink-2); display: grid; gap: 14px; }
+  .setup ol { padding-left: 18px; display: grid; gap: 8px; }
+  .setup b { color: var(--ink); }
+  .setup code { font-size: 12.5px; padding: 2px 6px; border-radius: 6px; background: var(--fill-2); color: var(--ink); user-select: all; }
+
+  /* Cola */
+  .nowp { margin: 0 20px 14px; padding: 14px; border-radius: 16px; background: var(--fill); display: grid; grid-template-columns: 64px 1fr; gap: 14px; align-items: center; }
+  .nowp img { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; background: var(--fill-2); }
+  .nowp b { display: block; font-size: 15px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nowp small { display: block; color: var(--ink-2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nowp .bar { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center; color: var(--ink-3); font-size: 12px; }
+  .nowp .track { height: 4px; border-radius: 9px; background: rgb(255 255 255 / .12); overflow: hidden; }
+  .nowp .fill { height: 100%; background: var(--ink-2); transform-origin: left; transform: scaleX(0); }
+  .col:last-child { grid-template-rows: auto auto auto 1fr auto; }
+  .scorebar { margin: 0 20px 14px; padding: 12px 14px 10px; border-radius: 14px; background: var(--fill); }
+  .scorebar .sbtop { display: flex; align-items: center; gap: 10px; color: var(--ink-2); font-size: 13px; }
+  .scorebar .sbtop b { margin-left: auto; color: var(--ink); font-size: 15px; }
+  .scorebar .sbtop .btn { height: 30px; padding: 0 10px; font-size: 12.5px; }
+  .scorebar input { width: 100%; height: 28px; padding: 0; border: 0; background: none; margin-top: 6px; accent-color: oklch(0.86 0.13 90); }
+  .scorebar input::-webkit-slider-runnable-track { height: 10px; border-radius: 99px;
+    background: linear-gradient(90deg, oklch(0.62 0.2 25), oklch(0.74 0.15 55) 30%, oklch(0.86 0.13 90) 50%, oklch(0.78 0.16 140) 70%, oklch(0.7 0.17 155)); }
+  .scorebar input::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -6px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgb(0 0 0 / .5); }
+  .scorebar input { -webkit-appearance: none; }
+  .sblab { display: flex; justify-content: space-between; color: var(--ink-3); font-size: 11.5px; margin-top: 2px; }
+  .fxbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 20px 14px; }
+  .fxbar #cine[aria-pressed="true"] { background: var(--ink); color: #111; }
+  .beatdot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); transition: background-color 120ms ease, transform 120ms ease; }
+  #beatBtn[aria-pressed="true"] .beatdot { background: var(--ok); }
+  .beatdot.hit { transform: scale(1.8); background: #fff !important; transition-duration: 0ms; }
+  .sync { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--ink-2); font-size: 13px; }
+  .sync .btn { height: 34px; padding: 0 10px; }
+  .judge { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; }
+  .btn.mehv { background: color-mix(in oklch, oklch(0.75 0.11 78) 24%, transparent); color: oklch(0.9 0.07 80); padding: 0 18px; }
+  .judge .coins { justify-content: center; border-radius: 10px; }
+  .btn.like { background: color-mix(in oklch, var(--ok) 22%, transparent); color: oklch(0.9 0.08 150); }
+  .btn.savev { background: color-mix(in oklch, oklch(0.7 0.14 240) 30%, transparent); color: oklch(0.9 0.07 240); height: 46px; font-size: 15px; }
+  .btn.lovev { background: color-mix(in oklch, var(--rose) 18%, transparent); color: var(--rose-ink); }
+  .btn.skipv { background: color-mix(in oklch, oklch(0.65 0.18 25) 22%, transparent); color: oklch(0.88 0.08 25); }
+  .manual { margin: 0 8px 12px; padding: 14px; border-radius: 14px; display: grid; gap: 10px; line-height: 1.45; color: var(--ink-2);
+    background: color-mix(in oklch, var(--warn) 12%, transparent); }
+  .manual b { color: var(--ink); }
+  .manual .btn { text-decoration: none; justify-content: flex-start; overflow: hidden; text-overflow: ellipsis; }
+  .row-q .cv { position: relative; display: block; width: 52px; height: 52px; }
+  .row-q .cv .av { position: absolute; right: -5px; bottom: -5px; width: 22px; height: 22px; font-size: 10px; box-shadow: 0 0 0 2px #0d0c0e; }
+  .row-q .ctl { display: flex; gap: 2px; }
+  .row-q .ctl [data-move]:disabled { visibility: hidden; }
+  .row-q { display: grid; grid-template-columns: 22px 52px 1fr auto auto; gap: 12px; align-items: center; padding: 8px; border-radius: 12px; }
+  .row-q .pos { color: var(--ink-3); text-align: right; font-weight: 600; font-size: 13px; }
+  .row-q .pos svg { color: var(--ink); }
+  .row-q.locked { background: var(--fill); }
+  .coins { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700; color: var(--rose-ink);
+    padding: 3px 8px 3px 6px; border-radius: 99px; background: color-mix(in oklch, var(--rose) 20%, transparent); }
+  .coins svg { color: var(--rose); font-size: 15px; }
+  .credits { border-top: 1px solid var(--line); padding: 12px 20px 16px; color: var(--ink-2); font-size: 13px; line-height: 1.6; }
+  .credits b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 1100px) {
+    body { overflow: auto; grid-template-rows: auto auto; }
+    .top { flex-wrap: wrap; gap: 12px 20px; }
+    .cols { grid-template-columns: 1fr; min-height: auto; }
+    .col { min-height: auto; }
+    .col { border-right: 0; border-bottom: 1px solid var(--line); }
+    .col .scroll { max-height: 55vh; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/" title="Volver al inicio" style="color:inherit;text-decoration:none"><span id="brandIcon"></span>Sonando</a>
+  <nav class="pills" aria-label="Conexiones">
+    <button class="pill" data-pop="tt" aria-haspopup="dialog" title="TikTok"><span class="dot" id="ttDot"></span><span id="ttStatus">TikTok</span></button>
+    <button class="pill" data-pop="sp" aria-haspopup="dialog" title="Spotify"><span class="dot" id="spDot"></span><span id="spStatus">Spotify</span></button>
+    <button class="pill" data-pop="cloud" aria-haspopup="dialog" id="cloudBox" hidden title="Supabase"><span class="dot" id="cloudDot"></span><span id="cloudStatus">Supabase</span></button>
+  </nav>
+  <div class="acts">
+    <a class="btn ghost" href="/">Inicio</a>
+    <a class="btn ghost" href="/stage" target="_blank">Pantalla del directo</a>
+    <a class="btn ghost" href="/top" target="_blank">Top</a>
+    <button class="btn ghost" id="devBtn" aria-pressed="false">Desarrollador</button>
+    <button class="btn" id="setBtn">${icon.gear}Ajustes</button>
+  </div>
+</header>
+
+<div class="pop" id="pop" role="dialog" hidden></div>
+
+<main class="cols">
+  <section class="col">
+    <header><h2>Chat del directo</h2><span>Pulsa un mensaje para buscarlo</span></header>
+    <div class="scroll" id="chat"></div>
+    <section class="sim" id="dev" hidden>
+      <h3>Modo desarrollador <span>todo es de mentira</span></h3>
+      <div class="row">
+        <input id="simNick" value="maria_23" aria-label="Quién lo manda" spellcheck="false">
+        <input id="simText" value="ponme ojitos lindos de bad bunny" aria-label="Mensaje de chat falso">
+      </div>
+      <div class="acts"><button class="btn" data-sim="chat">Enviar mensaje</button>
+        <button class="btn" id="simRandom">Usuario al azar</button></div>
+      <div class="gifts" id="gifts"></div>
+      <div class="acts"><label class="cnt">Cantidad <input id="simCount" type="number" min="1" max="999" value="1"></label>
+        <button class="btn icon" id="simReset" title="Borrar saldo de regalos" aria-label="Borrar saldo de regalos"></button></div>
+    </section>
+  </section>
+
+  <section class="col">
+    <header><h2>Añadir canción</h2><span id="hint"></span></header>
+    <div id="mid"></div>
+    <div></div>
+  </section>
+
+  <section class="col">
+    <header><h2>Cola</h2><span class="num" id="qCount"></span></header>
+    <div class="fxbar" id="fx">
+      <button class="btn" id="cine" aria-pressed="false">Modo cine</button>
+      <button class="btn rose" id="drop">¡Drop!</button>
+      <button class="btn" id="beatBtn" aria-pressed="false"><span class="beatdot" id="beatDot"></span><span id="beatTxt">Activar ritmo</span></button>
+      <span class="sync" id="sync"></span>
+    </div>
+    <div class="scorebar" id="scorebar" hidden>
+      <div class="sbtop"><span>Medidor</span><b class="num" id="scoreVal">0 · Normal</b><button class="btn" id="scoreHide" type="button">Ocultar</button></div>
+      <input type="range" id="score" min="-50" max="50" step="1" value="0" aria-label="Cuánto te gusta la canción, de −50 a +50">
+      <div class="sblab num"><span>−50 Basura</span><span>Flojo</span><span>0</span><span>Buena</span><span>Temazo +50</span></div>
+    </div>
+    <div class="scroll" id="queueWrap"></div>
+    <div class="credits" id="credits" hidden></div>
+  </section>
+</main>
+
+<script type="module">
+import { subscribe, progressOf, fmt, esc, icon, avatar } from '/live.js';
+import { mountAjustes, updateAjustes } from '/ajustes.js';
+
+const $ = id => document.getElementById(id);
+const HOST_USER = { id: '__host', nick: 'Tú', avatar: '' };
+let S = null, requester = HOST_USER, picked = null, results = [], note = null, searching = false, midMode = '';
+$('brandIcon').innerHTML = icon.rose;
+$('setBtn').innerHTML = `${icon.gear}Ajustes`;
+
+const api = async (url, data) => {
+  const r = await fetch(url, data === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Algo falló');
+  return j;
+};
+
+const ajustes = mountAjustes(api);
+subscribe(s => {
+  const first = !S; S = s;
+  renderTop(); renderChat(); renderMid(); renderQueue(); renderScore(); updateAjustes(s);
+});
+
+// ---------- barra superior: estado corto; los detalles y los cambios, en Ajustes ----------
+function renderTop() {
+  const t = S.tiktok;
+  $('ttDot').className = `dot ${t.status}`;
+  $('ttStatus').textContent = t.user ? `@${t.user} · ${{ on: 'en directo', connecting: 'conectando…', off: t.error ? 'sin directo' : 'desconectado' }[t.status]}` : 'Conecta TikTok';
+  $('spDot').className = `dot ${S.spotify.status === 'ok' && !S.spotify.error ? 'ok' : S.spotify.status === 'ok' ? 'connecting' : ''}`;
+  $('spStatus').textContent = S.spotify.status !== 'ok' ? 'Conecta Spotify' : S.spotify.error ? 'Spotify · revisa' : S.manual ? 'Spotify · manual' : 'Spotify';
+  $('cloudBox').hidden = !S.cloud || S.cloud.status === 'off';
+  if (S.cloud) { $('cloudDot').className = `dot ${S.cloud.status === 'ok' ? 'ok' : 'connecting'}`; $('cloudStatus').textContent = S.cloud.status === 'ok' ? 'Supabase' : 'Supabase · revisa'; }
+}
+// los errores largos se leen en el panel de la cola (Spotify) o en Ajustes
+let popKind = null;
+function popHtml(k) {
+  if (k === 'tt') return `<h4>TikTok</h4>
+    <p>${S.tiktok.status === 'on' ? 'Conectado a tu directo.' : S.tiktok.error ? esc(S.tiktok.error) : 'Escribe tu usuario. Se conecta cuando estés en directo.'}</p>
+    <form class="row" id="popTt"><input id="popTtUser" value="${S.tiktok.user ? '@' + esc(S.tiktok.user) : ''}" placeholder="@tu_usuario" autocomplete="off" spellcheck="false" aria-label="Usuario de TikTok"><button class="btn primary">${S.tiktok.status === 'on' ? 'Reconectar' : 'Conectar'}</button></form>`;
+  if (k === 'sp') return `<h4>Spotify</h4>
+    <p>${S.spotify.status !== 'ok' ? 'Sin conectar.' : S.spotify.error ? esc(S.spotify.error) : S.manual ? 'Conectado en modo manual (sin Premium): pones tú cada canción.' : 'Conectado.'}</p>
+    <div class="row"><a class="btn primary" href="/spotify/login" style="text-decoration:none">${S.spotify.status === 'ok' ? 'Reconectar' : 'Conectar'}</a><button class="btn" data-more>Más en Ajustes</button></div>`;
+  return `<h4>Supabase</h4>
+    <p>${S.cloud?.status === 'ok' ? 'Los puntos se están guardando en ' + esc(S.supabaseUrl) + '.' : esc(S.cloud?.error || 'Sin configurar.')}</p>
+    <div class="row"><button class="btn" data-more>Abrir Ajustes</button></div>`;
+}
+function openPop(k, anchor) {
+  const p = $('pop');
+  if (popKind === k && !p.hidden) return closePop();
+  popKind = k; p.innerHTML = popHtml(k);
+  const r = anchor.getBoundingClientRect();
+  const left = Math.max(12, Math.min(innerWidth - 332, r.left + r.width / 2 - 160));
+  p.style.left = `${left}px`; p.style.top = `${r.bottom + 10}px`;
+  p.style.setProperty('--ox', `${r.left + r.width / 2 - left}px`); // crece desde la pastilla
+  p.hidden = false;
+  if (k === 'tt') { $('popTtUser').focus(); $('popTt').onsubmit = e => { e.preventDefault(); api('/api/tiktok', { username: $('popTtUser').value }); closePop(); }; }
+  p.querySelector('[data-more]')?.addEventListener('click', () => { closePop(); ajustes.openDrawer(); });
+}
+function closePop() { $('pop').hidden = true; popKind = null; }
+document.querySelectorAll('[data-pop]').forEach(b => b.onclick = e => { e.stopPropagation(); openPop(b.dataset.pop, b); });
+addEventListener('click', e => { if (popKind && !$('pop').contains(e.target)) closePop(); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && popKind) closePop(); });
+$('setBtn').onclick = () => ajustes.openDrawer();
+if (location.hash === '#ajustes') setTimeout(() => ajustes.openDrawer(), 300); // desde el menú de inicio
+
+// ---------- chat ----------
+let chatSig = '';
+function renderChat() {
+  const box = $('chat'), sig = S.chat.map(m => m.id).join() + picked + JSON.stringify(S.points?.pts || {}) + S.settings?.showPoints;
+  if (sig === chatSig) return; chatSig = sig;
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  box.innerHTML = S.chat.length ? S.chat.map(m => `
+    <div class="msg ${m.kind} ${m.id === picked ? 'picked' : ''}" data-id="${m.id}" role="button" tabindex="0">
+      ${avatar(m.user, 32)}
+      <span><b>${esc(m.user.nick)}${S.settings?.showPoints !== false && S.points?.pts?.[m.user.id] ? `<i class="pts num">${S.points.pts[m.user.id]} pts</i>` : ''}</b><p>${m.kind === 'gift' ? `${m.image ? `<img class="gimg" src="${esc(m.image)}" alt="">` : icon.rose}${esc(m.count > 1 ? m.text : `1 ${m.gift || m.text}`)}` : esc(m.text)}</p></span>
+      ${m.kind === 'chat' ? `<button class="btn icon copy" data-copy="${m.id}" aria-label="Copiar mensaje">${icon.copy}</button>` : '<span></span>'}
+    </div>`).join('')
+    : '<p class="empty">Aquí aparecen los mensajes del directo en cuanto conectes TikTok.<br>Para probar sin directo, pulsa «Modo desarrollador» arriba.</p>';
+  if (atBottom) box.scrollTop = box.scrollHeight;
+}
+// buscar desde el chat: el mensaje entero (clic) o solo el trozo que selecciones (p. ej. el nombre de la canción)
+function pickFromChat(m, text) {
+  if (midMode !== 'search') { navigator.clipboard.writeText(text); return; } // sin Spotify todavía: al menos copia
+  picked = m.id; requester = m.user; chatSig = '';
+  renderChat(); renderMid(true);
+  $('q').value = text; search(text);
+}
+let pickedBySelection = false;
+$('chat').addEventListener('mouseup', e => {
+  const text = getSelection().toString().replace(/\s+/g, ' ').trim();
+  const m = S.chat.find(x => x.id === e.target.closest('.msg')?.dataset.id);
+  if (text.length < 2 || !m || m.kind !== 'chat' || e.target.closest('[data-copy]')) return;
+  pickedBySelection = true; // el clic que llega justo después no debe buscar el mensaje entero
+  pickFromChat(m, text);
+});
+$('chat').addEventListener('click', e => {
+  if (pickedBySelection) { pickedBySelection = false; return; }
+  const copy = e.target.closest('[data-copy]');
+  const m = S.chat.find(x => x.id === (copy?.dataset.copy || e.target.closest('.msg')?.dataset.id));
+  if (!m) return;
+  if (copy) { navigator.clipboard.writeText(m.text); flash(copy); return; }
+  if (m.kind !== 'chat') return;
+  pickFromChat(m, m.text);
+});
+$('chat').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('msg')) e.target.click(); });
+function flash(btn) { const old = btn.innerHTML; btn.innerHTML = icon.check; setTimeout(() => btn.innerHTML = old, 900); }
+
+// ---------- modo desarrollador: regalos y chat de mentira ----------
+// precios en monedas de los regalos más típicos de TikTok
+const GIFTS = [['Rosa', 1], ['GG', 1], ['Corazón con dedos', 5], ['Rosquilla', 30], ['Perfume', 20], ['Gorra', 99], ['Galaxia', 1000], ['León', 29999]];
+$('gifts').innerHTML = GIFTS.map(([n, c], i) => `<button class="btn rose" data-gift="${i}">${n}<small>${c} ${c === 1 ? 'moneda' : 'monedas'}</small></button>`).join('');
+$('simReset').innerHTML = icon.x;
+const nick = () => $('simNick').value.trim() || 'invitado';
+document.querySelector('[data-sim="chat"]').onclick = () => api('/api/sim', { kind: 'chat', nick: nick(), text: $('simText').value });
+$('gifts').onclick = e => {
+  const b = e.target.closest('[data-gift]'); if (!b) return;
+  const [name, coins] = GIFTS[+b.dataset.gift];
+  api('/api/sim', { kind: 'gift', nick: nick(), gift: name, coins, count: Math.max(1, Math.min(999, +$('simCount').value || 1)) });
+};
+$('simRandom').onclick = () => { $('simNick').value = ['luna.mp3', 'davidd', 'sofi_rk', 'xavi99', 'ana.beats', 'shiroo', 'pablo_rk', 'mery'][Math.floor(Math.random() * 8)] + Math.floor(Math.random() * 90 + 10); };
+$('simReset').onclick = () => api('/api/sim', { kind: 'reset' });
+let dev = false;
+try { dev = localStorage.getItem('sonando-dev') === '1'; } catch {}
+const setDev = on => { dev = on; $('dev').hidden = !on; $('devBtn').setAttribute('aria-pressed', String(on)); try { localStorage.setItem('sonando-dev', on ? '1' : '0'); } catch {} };
+$('devBtn').onclick = () => setDev(!dev); setDev(dev);
+
+// ---------- búsqueda / configuración ----------
+function renderMid(force) {
+  const mode = !S.hasClientId ? 'setup' : S.spotify.status !== 'ok' ? 'login' : 'search';
+  if (mode === midMode && !force) return renderResults();
+  midMode = mode;
+  const mid = $('mid');
+  if (mode === 'setup') {
+    mid.innerHTML = `<div class="setup">
+      <p>Una sola vez: crea tu app de Spotify (gratis) para que Sonando pueda poner canciones.</p>
+      <ol>
+        <li>Entra en <a class="link" href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">developer.spotify.com/dashboard</a> y pulsa <b>Create app</b>.</li>
+        <li>En <b>Redirect URI</b> pega <code>http://127.0.0.1:5190/callback</code> y marca <b>Web API</b>.</li>
+        <li>Guarda, copia el <b>Client ID</b> y pégalo aquí:</li>
+      </ol>
+      <form id="cidForm" style="display:flex;gap:8px"><input id="cid" placeholder="Client ID" autocomplete="off" spellcheck="false"><button class="btn primary">Guardar</button></form>
+    </div>`;
+    $('cidForm').onsubmit = e => { e.preventDefault(); api('/api/spotify-client', { clientId: $('cid').value }); };
+    return;
+  }
+  if (mode === 'login') {
+    mid.innerHTML = `<div class="setup"><p>Falta darle permiso a Sonando en tu cuenta de Spotify (Premium).</p>
+      <p><a class="btn primary" href="/spotify/login" style="text-decoration:none">Conectar Spotify</a></p></div>`;
+    return;
+  }
+  mid.innerHTML = `
+    <form class="searchbar" id="sForm">
+      <label class="field">${icon.search}<input id="q" placeholder="Canción y artista" autocomplete="off" spellcheck="false" aria-label="Buscar en Spotify"></label>
+      <div class="for" id="for"></div>
+    </form>
+    <div id="note"></div>
+    <div class="scroll" id="results"></div>`;
+  let t;
+  $('q').oninput = () => { clearTimeout(t); t = setTimeout(() => search($('q').value), 280); };
+  $('sForm').onsubmit = e => { e.preventDefault(); clearTimeout(t); search($('q').value); };
+  renderResults();
+}
+
+// búsqueda: canciones y, debajo, álbumes/EPs que se abren para añadir lo que lleven dentro
+let albums = [], albumView = null, resSig = '';
+async function search(q) {
+  q = q.trim(); note = null; albumView = null;
+  if (!q) { results = []; albums = []; return renderResults(); }
+  searching = true; renderResults();
+  try { const r = await api(`/api/search?q=${encodeURIComponent(q)}`); results = r.tracks || []; albums = r.albums || []; }
+  catch (e) { results = []; albums = []; note = { bad: true, text: e.message }; }
+  searching = false; renderResults();
+}
+async function openAlbum(i) {
+  const a = albums[i];
+  albumView = { ...a, tracks: [], loading: true }; renderResults();
+  try { albumView = await api(`/api/album?id=${encodeURIComponent(a.id)}`); }
+  catch (e) { albumView = null; note = { bad: true, text: e.message }; }
+  $('results').scrollTop = 0; renderResults();
+}
+const shownTracks = () => albumView ? albumView.tracks : results;
+const kind = t => t === 'single' ? 'Single / EP' : t === 'compilation' ? 'Recopilatorio' : 'Álbum';
+
+function renderResults() {
+  if (midMode !== 'search') return;
+  $('for').innerHTML = `${avatar(requester, 22)}<span>Se añade a nombre de <b>${esc(requester.nick)}</b></span>
+    ${requester !== HOST_USER ? `<button type="button" class="btn icon" id="clearFor" aria-label="Añadir a mi nombre">${icon.x}</button>` : ''}`;
+  $('clearFor')?.addEventListener('click', () => { requester = HOST_USER; picked = null; chatSig = ''; renderChat(); renderResults(); });
+  $('note').innerHTML = note ? `<p class="note ${note.bad ? 'bad' : 'good'}">${esc(note.text)}</p>` : '';
+  const inQueue = new Set([S.now?.uri, S.upNext?.uri, ...S.queue.map(e => e.uri)]);
+  const host = requester === HOST_USER;
+  const row = (r, i) => `
+      <div class="res">
+        <img src="${esc(r.art)}" alt="">
+        <span><b>${esc(r.name)}</b><small>${esc(r.artists)} · <span class="num">${fmt(r.durationMs)}</span></small></span>
+        ${inQueue.has(r.uri) ? '<span class="status">En cola</span>' : `<span style="display:flex;gap:6px">
+          ${host ? `<button class="btn" data-add="${i}" data-next="1" title="Ponerla la siguiente">Siguiente</button>` : ''}
+          <button class="btn" data-add="${i}">${icon.plus}Añadir</button></span>`}
+      </div>`;
+  let html;
+  if (searching && !results.length) html = '<p class="empty">Buscando…</p>';
+  else if (albumView) {
+    const left = albumView.tracks.filter(t => !inQueue.has(t.uri)).length;
+    html = `<div class="albhead">
+        <button class="btn" data-back>${icon.up}Volver</button>
+        <img src="${esc(albumView.art)}" alt="">
+        <span><b>${esc(albumView.name)}</b><small>${kind(albumView.type)} · ${esc(albumView.artists)}</small></span>
+        ${albumView.loading ? '' : left ? `<button class="btn primary" data-addall>${icon.plus}Añadir todas (${left})</button>` : '<span class="status">Todas en cola</span>'}
+      </div>` + (albumView.loading ? '<p class="empty">Abriendo…</p>' : albumView.tracks.map(row).join(''));
+  } else if (results.length || albums.length) {
+    html = results.map(row).join('') + (albums.length ? `<h3 class="reshead">Álbumes y EPs</h3>` + albums.map((a, i) => `
+      <button class="res alb" data-album="${i}">
+        <img src="${esc(a.art)}" alt="">
+        <span><b>${esc(a.name)}</b><small>${kind(a.type)} · ${esc(a.artists)} · ${a.count} ${a.count === 1 ? 'canción' : 'canciones'}</small></span>
+        <span class="status">Abrir</span>
+      </button>`).join('') : '');
+  } else html = '<p class="empty">Pulsa un mensaje del chat o escribe aquí. Tú eliges la versión buena.</p>';
+  if (html !== resSig) { resSig = html; $('results').innerHTML = html; } // sin repintar si no cambia (no parpadea al pasar el ratón)
+}
+
+$('mid').addEventListener('click', async e => {
+  if (e.target.closest('[data-back]')) { albumView = null; renderResults(); return; }
+  const al = e.target.closest('[data-album]'); if (al) return openAlbum(+al.dataset.album);
+  const all = e.target.closest('[data-addall]');
+  if (all) {
+    all.disabled = true;
+    const inQueue = new Set([S.now?.uri, S.upNext?.uri, ...S.queue.map(x => x.uri)]);
+    let ok = 0, fail = '';
+    for (const t of albumView.tracks.filter(x => !inQueue.has(x.uri))) {
+      try { await api('/api/add', { track: t, user: requester }); ok++; } catch (err) { fail = err.message; break; }
+    }
+    note = fail && !ok ? { bad: true, text: fail } : { text: `${ok} ${ok === 1 ? 'canción añadida' : 'canciones añadidas'}${fail ? ` (paré: ${fail})` : ''}` };
+    renderResults(); return;
+  }
+  const b = e.target.closest('[data-add]');
+  if (!b) return;
+  b.disabled = true;
+  try {
+    await api('/api/add', { track: shownTracks()[+b.dataset.add], user: requester, next: !!b.dataset.next });
+    note = { text: `Añadida a nombre de ${requester.nick}` };
+    if (!albumView) { requester = HOST_USER; picked = null; chatSig = ''; renderChat(); }
+  } catch (err) { note = { bad: true, text: err.message }; b.disabled = false; }
+  renderResults();
+});
+
+// ---------- cola ----------
+let qSig = '';
+function renderQueue() {
+  const items = [...(S.upNext ? [{ ...S.upNext, locked: true }] : []), ...S.queue];
+  $('qCount').textContent = `${S.queue.length} / ${S.rules.max}`;
+  const J = S.judge?.uri === S.now?.uri ? S.judge : {};
+  const sig = JSON.stringify([S.now?.uri, S.now?.isPlaying, items.map(e => [e.id, e.coins]), J.kind, J.loved, S.canLove, S.manual]);
+  if (sig !== qSig) {
+    qSig = sig;
+    const n = S.now;
+    $('queueWrap').innerHTML = (n ? `
+      <div class="nowp">
+        <img src="${esc(n.art)}" alt="">
+        <span style="min-width:0"><b>${esc(n.name)}</b><small>${esc(n.artists)}${n.user ? ` · pedida por ${esc(n.user.nick)}` : ''}</small></span>
+        <div class="bar num" style="grid-template-columns:auto 1fr auto"><span id="npCur">0:00</span><div class="track"><div class="fill" id="npFill"></div></div><span>${fmt(n.durationMs)}</span></div>
+        <div class="judge">${J.kind === 'pending'
+          ? '<button class="btn savev" data-verdict="save" style="grid-column:1/3">Salvarla · <span class="num" id="saveLeft">15</span> s</button><button class="btn mehv" data-verdict="meh">Meh</button>'
+          : `<button class="btn like" data-verdict="like" ${J.kind === 'liked' ? 'disabled' : ''}>${icon.check}${J.kind === 'liked' ? 'Aprobada' : 'Me gusta'}</button>
+          <button class="btn mehv" data-verdict="meh" ${J.kind === 'meh' ? 'disabled' : ''}>Meh</button>
+          ${n.coins ? '<span class="coins">Donada · entera</span>'
+            : J.kind === 'skipped' ? '<span class="coins">Saltando…</span>'
+            : `<button class="btn skipv" data-verdict="skip">${icon.skip}Saltar en 15 s</button>`}`}
+          <button class="btn lovev" data-verdict="love" style="grid-column:1/-1" ${J.loved ? 'disabled' : ''}>${J.loved ? 'Guardada en tus Me gusta' : S.canLove ? 'Guardar en mi lista' : 'Guardar en mi lista (reconecta Spotify)'}</button>
+        </div>
+      </div>` : `
+      <div class="nowp" style="grid-template-columns:1fr"><span class="status">No suena nada.${S.queue.length ? '' : ' Añade una canción y empieza sola.'}</span>
+      ${S.queue.length ? `<button class="btn primary" id="skip">${icon.play}Empezar</button>` : ''}</div>`)
+      + (S.manual && S.queue.length ? `
+      <div class="manual">
+        <span><b>Sin Spotify Premium</b> · la app no puede poner canciones. Pon tú la siguiente y la detecta sola:</span>
+        <a class="btn primary" href="spotify:track:${esc(S.queue[0].uri.split(':').pop())}">${icon.play}Abrir «${esc(S.queue[0].name)}» en Spotify</a>
+      </div>` : '')
+      + (items.length ? items.map((e, i) => `
+      <div class="row-q ${e.locked ? 'locked' : ''}">
+        <span class="pos num">${e.locked ? icon.play : i + (S.upNext ? 0 : 1)}</span>
+        <span class="cv"><img src="${esc(e.art)}" alt="">${e.user.id !== '__host' ? avatar(e.user, 22) : ''}</span>
+        <span><b>${esc(e.name)}</b><small>${esc(e.artists)} · ${esc(e.user.nick)}${e.locked ? ' · ya en camino' : ''}</small></span>
+        ${e.coins ? `<span class="coins num"><img src="/img/moneda.png" alt="" style="width:16px;height:16px">${e.coins}</span>` : '<span></span>'}
+        ${e.locked ? '<span></span>' : `<span class="ctl">
+          <button class="btn icon" data-move="${e.id}" data-dir="-1" aria-label="Subir" title="Subir" ${i === (S.upNext ? 1 : 0) ? 'disabled' : ''}>${icon.up}</button>
+          <button class="btn icon" data-move="${e.id}" data-dir="1" aria-label="Bajar" title="Bajar" ${i === items.length - 1 ? 'disabled' : ''}>${icon.down}</button>
+          <button class="btn icon" data-now="${e.id}" aria-label="Poner ya" title="Poner ya">${icon.play}</button>
+          <button class="btn icon" data-rm="${e.id}" aria-label="Quitar de la cola" title="Quitar">${icon.x}</button></span>`}
+      </div>`).join('') : '<p class="empty">La cola está vacía.</p>');
+  }
+  $('cine').setAttribute('aria-pressed', String(!!S.fx?.cinema));
+  const L = S.lyrics, syncKey = !L?.lines.length ? 'none' : L.synced ? `s${S.offset}` : 'plain';
+  if ($('sync').dataset.k !== syncKey) {
+    $('sync').dataset.k = syncKey;
+    $('sync').innerHTML = syncKey === 'none' ? ''
+      : L.synced ? `Letra <button class="btn" data-off="-500">−0,5 s</button><span class="num">${(S.offset / 1000).toFixed(1)} s</span><button class="btn" data-off="500">+0,5 s</button>`
+      : `Letra sin sincronizar <button class="btn" data-scroll="-160" aria-label="Subir letra">▲</button><button class="btn" data-scroll="160" aria-label="Bajar letra">▼</button>`;
+  }
+  const cr = Object.entries(S.credits);
+  $('credits').hidden = !cr.length;
+  $('credits').innerHTML = `Saldo de regalos sin canción: ${cr.map(([u, c]) => `<b>${esc(S.points?.names?.[u] || u)}</b> ${c}`).join(' · ')}`;
+}
+// medidor: se envía mientras arrastras (máx. ~15 veces por segundo); si no lo tocas, sigue al servidor
+const MLAB = v => v <= -35 ? 'Basura' : v <= -15 ? 'Flojo' : v < 15 ? 'Normal' : v < 35 ? 'Buena' : 'Temazo';
+let dragging = false, scoreSent = 0, scoreTimer;
+const showScore = v => { $('scoreVal').textContent = `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v)} · ${MLAB(v)}`; };
+$('score').addEventListener('pointerdown', () => { dragging = true; });
+addEventListener('pointerup', () => { dragging = false; });
+$('score').addEventListener('input', () => {
+  const v = +$('score').value; showScore(v);
+  clearTimeout(scoreTimer);
+  const go = () => { scoreSent = Date.now(); api('/api/score', { value: v }); };
+  if (Date.now() - scoreSent > 70) go(); else scoreTimer = setTimeout(go, 70);
+});
+$('scoreHide').onclick = () => api('/api/score', { hide: true });
+function renderScore() {
+  $('scorebar').hidden = !S.now;
+  const sc = S.score?.uri === S.now?.uri ? S.score : { value: 0 };
+  if (!dragging && document.activeElement !== $('score')) { $('score').value = sc.value; showScore(sc.value); }
+  $('scoreHide').hidden = !sc.set;
+}
+$('cine').onclick = () => api('/api/fx', { cinema: !S.fx?.cinema });
+$('drop').onclick = () => api('/api/fx', { drop: true });
+
+// ---------- ritmo: escucha el audio del PC desde aquí (no en la pantalla del directo) ----------
+// El detector corre en el hilo de audio (beat-worklet.js): sigue aunque esta pestaña quede en segundo plano.
+// Cada golpe se manda al servidor y la pantalla del directo late con él.
+let beatCtx = null;
+$('beatBtn').onclick = async () => {
+  if (beatCtx) { await beatCtx.close(); beatCtx = null; $('beatBtn').setAttribute('aria-pressed', 'false'); $('beatTxt').textContent = 'Activar ritmo'; return; }
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, systemAudio: 'include' });
+    if (!stream.getAudioTracks().length) throw new Error('sin audio');
+    stream.getVideoTracks().forEach(t => t.enabled = false); // solo hace falta el sonido
+    const ctx = new AudioContext();
+    await ctx.audioWorklet.addModule('/beat-worklet.js');
+    const node = new AudioWorkletNode(ctx, 'beat', { numberOfInputs: 3, numberOfOutputs: 0 });
+    const src = ctx.createMediaStreamSource(stream); // no va a los altavoces: solo se mide
+    const BANDS = [[['highpass', 30], ['lowpass', 115], ['lowpass', 115]], [['highpass', 1000], ['lowpass', 4000]], [['highpass', 5000], ['lowpass', 12000]]];
+    BANDS.forEach((spec, i) => {
+      let n = src;
+      for (const [type, f] of spec) { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = 0.7; n.connect(b); n = b; }
+      n.connect(node, 0, i);
+    });
+    node.port.onmessage = e => {
+      fetch('/api/beat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(e.data), keepalive: true }).catch(() => {});
+      if (e.data.k !== 'drop' && !document.hidden) { const d = $('beatDot'); d.classList.add('hit'); setTimeout(() => d.classList.remove('hit'), 90); }
+    };
+    stream.getAudioTracks()[0].addEventListener('ended', () => { if (beatCtx === ctx) $('beatBtn').click(); });
+    beatCtx = ctx;
+    $('beatBtn').setAttribute('aria-pressed', 'true'); $('beatTxt').textContent = 'Ritmo activo';
+  } catch (err) { $('beatTxt').textContent = 'Marca «Compartir audio del sistema»'; console.warn(err); }
+};
+$('sync').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (b?.dataset.off) api('/api/offset', { delta: +b.dataset.off });
+  if (b?.dataset.scroll) api('/api/scroll', { delta: +b.dataset.scroll });
+});
+
+$('queueWrap').addEventListener('click', async e => {
+  const rm = e.target.closest('[data-rm]');
+  if (rm) return api('/api/remove', { id: rm.dataset.rm });
+  const mv = e.target.closest('[data-move]');
+  if (mv) return api('/api/move', { id: mv.dataset.move, dir: +mv.dataset.dir });
+  const pn = e.target.closest('[data-now]');
+  if (pn) { pn.disabled = true; try { await api('/api/playnow', { id: pn.dataset.now }); } catch (err) { alert(err.message); } finally { pn.disabled = false; } return; }
+  const vb = e.target.closest('[data-verdict]');
+  if (vb?.dataset.verdict === 'love' && !S.canLove) { location.href = '/spotify/login'; return; }
+  if (vb) { vb.disabled = true; try { await api('/api/verdict', { v: vb.dataset.verdict }); } catch (err) { alert(err.message); } vb.disabled = false; return; }
+  const sk = e.target.closest('#skip');
+  if (sk) { sk.disabled = true; try { await api('/api/skip', {}); } catch (err) { alert(err.message); } sk.disabled = false; }
+});
+
+(function frame() {
+  requestAnimationFrame(frame);
+  if (!S?.now || !$('npFill')) return;
+  const p = progressOf(S.now);
+  $('npFill').style.transform = `scaleX(${p / S.now.durationMs})`;
+  if ($('saveLeft') && S.judge?.until) $('saveLeft').textContent = Math.min(15, Math.max(0, Math.ceil((S.judge.until - Date.now()) / 1000)));
+  $('npCur').textContent = fmt(p);
+})();
+</script>
+</body>
+</html>

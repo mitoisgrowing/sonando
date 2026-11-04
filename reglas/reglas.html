@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Reglas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..800&display=block" rel="stylesheet">
+<style>
+  /* Tarjeta para el directo: se renderiza a PNG transparente con  render.bat  */
+  html, body { margin: 0; background: transparent; }
+  body { width: 1160px; padding: 60px 60px 90px; box-sizing: border-box; font-family: 'Inter', system-ui, sans-serif; font-optical-sizing: auto; -webkit-font-smoothing: antialiased; }
+  .island {
+    background: #000; color: #f7f5f6; border-radius: 72px; padding: 54px 64px 58px;
+    box-shadow: 0 40px 90px -30px rgb(0 0 0 / .85), 0 10px 30px -10px rgb(0 0 0 / .6), inset 0 1px 0 rgb(255 255 255 / .08);
+  }
+  .row { display: grid; grid-template-columns: 64px 1fr; gap: 30px; align-items: center; }
+  .row + .row { margin-top: 30px; }
+  .ico { width: 64px; height: 64px; display: grid; place-items: center; }
+  .ico img { width: 64px; height: 64px; }
+  .ico svg { width: 52px; height: 52px; color: rgb(247 245 246 / .7); }
+  p { margin: 0; font-size: 46px; line-height: 1.18; font-weight: 500; letter-spacing: -0.02em; color: rgb(247 245 246 / .72); text-wrap: balance; }
+  b { color: #fff; font-weight: 760; }
+  .line { height: 1px; background: rgb(255 255 255 / .1); margin: 36px 0 36px 94px; }
+</style>
+</head>
+<body>
+  <div class="island">
+    <div class="row">
+      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg></span>
+      <p><b>Pide</b> escribiendo canción y artista en el chat</p>
+    </div>
+    <div class="line"></div>
+    <div class="row">
+      <span class="ico"><img src="../public/img/rosa.png" alt=""></span>
+      <p><b>1 rosa</b>: tu canción sube 2 puestos</p>
+    </div>
+    <div class="row">
+      <span class="ico"><img src="../public/img/moneda.png" alt=""></span>
+      <p><b>5 monedas</b>: tu canción es la siguiente</p>
+    </div>
+    <div class="line"></div>
+    <div class="row">
+      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5.5v13l9-6.5-9-6.5Z" fill="currentColor"/><path d="M18 5v14"/></svg></span>
+      <p>Si no me convence, <b>la salto</b>. Si donas, se escucha entera</p>
+    </div>
+  </div>
+</body>
+</html>

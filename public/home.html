@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sonando</title>
+<link rel="stylesheet" href="/base.css">
+<style>
+  /* Portada: todo en una pantalla, tres tarjetas en el centro (1, 2, 3) */
+  html, body { height: 100%; }
+  @media (min-width: 901px) { html { overflow: hidden; } }
+  body { display: grid; grid-template-rows: auto 1fr auto; overflow: hidden;
+    background: radial-gradient(60% 55% at 50% 40%, oklch(0.2 0.04 12 / .55), transparent 75%), #0b0a0c; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 28px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 780; letter-spacing: -0.03em; }
+  .brand svg { color: var(--rose); width: 24px; height: 24px; }
+  .chips { display: flex; gap: 4px; padding: 4px; border-radius: 99px; background: rgb(255 255 255 / .05); }
+  .chip { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: 99px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+  .chip[hidden] { display: none; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); }
+  .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); }
+
+  .center { display: grid; place-content: center; justify-items: center; gap: 36px; padding: 0 24px; min-height: 0; }
+  h1 { font-size: clamp(30px, 4vw, 44px); font-weight: 800; letter-spacing: -0.04em; text-align: center; }
+  .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 270px)); gap: 18px; }
+  .card { position: relative; display: grid; grid-template-rows: auto auto 1fr auto; gap: 10px; height: 300px; padding: 26px 24px 22px; border-radius: 34px;
+    background: rgb(255 255 255 / .05); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .07); color: inherit; text-decoration: none; text-align: left;
+    transition: transform 180ms var(--ease-out), background-color 200ms ease, box-shadow 200ms ease; }
+  @media (hover: hover) { .card:hover { background: rgb(255 255 255 / .08); transform: translateY(-3px); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .12), 0 20px 40px -20px rgb(0 0 0 / .7); } }
+  .card:active { transform: scale(.98); }
+  .num { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 800; background: rgb(255 255 255 / .1); font-variant-numeric: tabular-nums; }
+  .card:first-child .num { background: var(--rose); color: #fff; }
+  .card h2 { font-size: 23px; font-weight: 760; letter-spacing: -0.03em; margin-top: 6px; }
+  .card p { color: var(--ink-2); font-size: 14px; line-height: 1.45; }
+  .card .go { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--ink-3); font-size: 13px; font-weight: 600; }
+  .card .go b { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 99px; background: var(--ink); color: #111; font-size: 13.5px; }
+  .card .go button { height: 34px; padding: 0 12px; border-radius: 99px; border: 0; background: rgb(255 255 255 / .1); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+  .card .go button:active { transform: scale(.97); }
+  .card .go > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mini { display: grid; gap: 6px; align-content: start; }
+  .mini div { display: grid; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center; font-size: 13.5px; }
+  .mini b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mini span:last-child { color: var(--ink-2); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .av { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; }
+
+  footer { text-align: center; padding: 0 24px 24px; color: var(--ink-3); font-size: 13px; }
+  kbd { padding: 1px 7px; border-radius: 6px; background: rgb(255 255 255 / .1); color: var(--ink-2); font: inherit; font-size: 12.5px; }
+  footer a { color: var(--ink-2); }
+  .in { animation: in 520ms var(--ease-out) both; }
+  @keyframes in { from { opacity: 0; transform: translateY(10px); } }
+  @media (max-width: 900px) { body { overflow: auto; } .cards { grid-template-columns: 1fr; width: min(420px, 100%); } .card { height: auto; min-height: 200px; } }
+  @media (prefers-reduced-motion: reduce) { .in { animation: none; } }
+</style>
+</head>
+<body>
+<header class="in">
+  <div class="brand"><span id="logo"></span>Sonando</div>
+  <nav class="chips" aria-label="Conexiones">
+    <span class="chip"><span class="dot" id="dTt"></span><span id="tTt">TikTok</span></span>
+    <span class="chip"><span class="dot" id="dSp"></span>Spotify</span>
+    <span class="chip" id="cSb" hidden><span class="dot" id="dSb"></span>Supabase</span>
+  </nav>
+</header>
+
+<main class="center">
+  <h1 class="in" style="animation-delay:40ms">¿Dónde quieres ir?</h1>
+  <div class="cards">
+    <a class="card in" href="/control" style="animation-delay:90ms">
+      <span class="num">1</span>
+      <h2>Panel de control</h2>
+      <p>Chat, búsqueda, cola, veredictos y medidor. Donde trabajas en el directo.</p>
+      <span class="go"><span id="nowPlaying"></span><b>Abrir</b></span>
+    </a>
+    <a class="card in" href="/stage" target="_blank" style="animation-delay:140ms">
+      <span class="num">2</span>
+      <h2>Pantalla del directo</h2>
+      <p>Lo que ve tu público. Captúrala como ventana en TikTok LIVE Studio.</p>
+      <span class="go"><button type="button" id="copyStage">Copiar enlace</button><b>Abrir</b></span>
+    </a>
+    <a class="card in" href="/top" style="animation-delay:190ms">
+      <span class="num">3</span>
+      <h2>Top de espectadores</h2>
+      <div class="mini" id="mini"><p>Quien escribe, pide o regala gana puntos.</p></div>
+      <span class="go"><span></span><b>Ver todos</b></span>
+    </a>
+  </div>
+</main>
+
+<footer class="in" style="animation-delay:240ms">Vuelve aquí con el logo del panel o pulsando <kbd>M</kbd> en la pantalla del directo · <a href="/control#ajustes">Ajustes</a></footer>
+
+<script type="module">
+import { subscribe, esc, icon, avatar } from '/live.js';
+const $ = id => document.getElementById(id);
+$('logo').innerHTML = icon.rose;
+$('copyStage').onclick = async e => {
+  e.preventDefault(); e.stopPropagation(); // no abrir la pantalla al copiar
+  await navigator.clipboard.writeText(`${location.origin}/stage`);
+  e.target.textContent = 'Copiado'; setTimeout(() => e.target.textContent = 'Copiar enlace', 1400);
+};
+let miniSig = '';
+subscribe(s => {
+  $('dTt').className = `dot ${s.tiktok.status === 'on' ? 'ok' : s.tiktok.user ? 'warn' : ''}`;
+  $('tTt').textContent = s.tiktok.user ? `@${s.tiktok.user}` : 'TikTok';
+  $('dSp').className = `dot ${s.spotify.status === 'ok' && !s.spotify.error ? 'ok' : s.spotify.status === 'ok' ? 'warn' : ''}`;
+  $('cSb').hidden = !s.cloud || s.cloud.status === 'off';
+  $('dSb').className = `dot ${s.cloud?.status === 'ok' ? 'ok' : 'warn'}`;
+  $('nowPlaying').textContent = s.now ? `Suena: ${s.now.name}` : '';
+  const top = (s.points?.top || []).slice(0, 3), sig = JSON.stringify(top.map(t => [t.id, t.pts]));
+  if (sig !== miniSig && top.length) { miniSig = sig; $('mini').innerHTML = top.map(t => `<div>${avatar(t, 26)}<b>${esc(t.nick)}</b><span>${t.pts}</span></div>`).join(''); }
+});
+</script>
+</body>
+</html>
