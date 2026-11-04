@@ -17,6 +17,10 @@ Sonando (AGPL-3.0) incluye o usa el siguiente trabajo de terceros. Cada uno cons
 | http-cache-semantics | BSD-2-Clause | https://github.com/kornelski/http-cache-semantics |
 | tslib | 0BSD | https://github.com/microsoft/tslib |
 | type-fest | MIT o CC0-1.0 | https://github.com/sindresorhus/type-fest |
+| kuroshiro 1.2 y kuroshiro-analyzer-kuromoji (letra en romaji) | MIT | https://github.com/hexenq/kuroshiro |
+| kuromoji 0.1 y su diccionario IPADIC (va dentro del .exe) | Apache-2.0 (diccionario: licencia de IPADIC, ver node_modules/kuromoji) | https://github.com/takuyaa/kuromoji.js |
+| pinyin-pro (letra china en pinyin) | MIT | https://github.com/zh-lx/pinyin-pro |
+| any-ascii (otros alfabetos) | ISC | https://github.com/anyascii/anyascii |
 
 En total, unas 50 librerías más con licencia MIT (dependencias de las anteriores). La lista exacta y sus textos de licencia están en `node_modules/*/LICENSE` al instalar el proyecto con `npm install`.
 

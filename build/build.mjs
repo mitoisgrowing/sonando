@@ -26,6 +26,9 @@ const walk = dir => { for (const f of fs.readdirSync(dir, { withFileTypes: true 
   if (f.isDirectory()) walk(p); else assets['public/' + rel] = p;
 } };
 walk(path.join(ROOT, 'public'));
+// diccionario japonés (kuromoji) para romanizar letras; se saca a %APPDATA%\Sonando la primera vez que hace falta
+const DICT = path.join(ROOT, 'node_modules', 'kuromoji', 'dict');
+for (const f of fs.readdirSync(DICT)) if (f.endsWith('.dat.gz')) assets['dict/' + f] = path.join(DICT, f);
 fs.writeFileSync(path.join(OUT, 'sea-config.json'), JSON.stringify({
   main: path.join(OUT, 'sonando.cjs'), output: path.join(OUT, 'sea-prep.blob'),
   disableExperimentalSEAWarning: true, useCodeCache: false, assets,

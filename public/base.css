@@ -27,6 +27,12 @@ body {
 }
 ::selection { background: color-mix(in oklch, var(--rose) 55%, transparent); color: #fff; }
 img { display: block; }
+
+/* Barras de desplazamiento: finas, invisibles hasta que pasas por encima, y nunca en horizontal */
+* { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+*:hover { scrollbar-color: rgb(255 255 255 / .2) transparent; }
+html, body { overflow-x: hidden; }
+:where(.scroll, .gpick, .glist) { overflow-x: hidden; scrollbar-gutter: stable; }
 .num { font-variant-numeric: tabular-nums; }
 svg.i { width: 1em; height: 1em; flex: none; }
 /* la foto va encima de la inicial; las insignias de la cola pueden colocarla en absoluto */

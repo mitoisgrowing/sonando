@@ -23,7 +23,7 @@
 
   .center { display: grid; place-content: center; justify-items: center; gap: 36px; padding: 0 24px; min-height: 0; }
   h1 { font-size: clamp(30px, 4vw, 44px); font-weight: 800; letter-spacing: -0.04em; text-align: center; }
-  .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 270px)); gap: 18px; }
+  .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 250px)); gap: 18px; }
   .card { position: relative; display: grid; grid-template-rows: auto auto 1fr auto; gap: 10px; height: 300px; padding: 26px 24px 22px; border-radius: 34px;
     background: rgb(255 255 255 / .05); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .07); color: inherit; text-decoration: none; text-align: left;
     transition: transform 180ms var(--ease-out), background-color 200ms ease, box-shadow 200ms ease; }
@@ -49,6 +49,7 @@
   footer a { color: var(--ink-2); }
   .in { animation: in 520ms var(--ease-out) both; }
   @keyframes in { from { opacity: 0; transform: translateY(10px); } }
+  @media (max-width: 1180px) and (min-width: 901px) { .cards { grid-template-columns: repeat(2, minmax(0, 250px)); } .card { height: 250px; } }
   @media (max-width: 900px) { body { overflow: auto; } .cards { grid-template-columns: 1fr; width: min(420px, 100%); } .card { height: auto; min-height: 200px; } }
   @media (prefers-reduced-motion: reduce) { .in { animation: none; } }
 </style>
@@ -78,8 +79,14 @@
       <p>Lo que ve tu público. Captúrala como ventana en TikTok LIVE Studio.</p>
       <span class="go"><button type="button" id="copyStage">Copiar enlace</button><b>Abrir</b></span>
     </a>
-    <a class="card in" href="/top" style="animation-delay:190ms">
+    <a class="card in" href="/editor" target="_blank" style="animation-delay:165ms">
       <span class="num">3</span>
+      <h2>Editor de pantalla</h2>
+      <p>Mueve, cambia el tamaño y el estilo de cada pieza. Diseños listos o el tuyo.</p>
+      <span class="go"><span></span><b>Abrir</b></span>
+    </a>
+    <a class="card in" href="/top" style="animation-delay:215ms">
+      <span class="num">4</span>
       <h2>Top de espectadores</h2>
       <div class="mini" id="mini"><p>Quien escribe, pide o regala gana puntos.</p></div>
       <span class="go"><span></span><b>Ver todos</b></span>

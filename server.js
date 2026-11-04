@@ -7,6 +7,9 @@ import sea from 'node:sea';
 import { TikTokLiveConnection, WebcastEvent, ControlEvent } from 'tiktok-live-connector';
 import * as Q from './queue.js';
 import * as G from './games.js';
+import { romanize, pickRomanized } from './romaji.js';
+import { translate } from './traducir.js';
+import { clean as cleanLayout, PRESET_LIST, presetLayout } from './public/layout.js';
 
 const PORT = +process.env.SONANDO_PORT || 5190; // otro puerto solo para pruebas (Spotify espera 5190)
 const HOST = '127.0.0.1'; // solo este PC: el panel no tiene contraseña
@@ -21,8 +24,11 @@ const load = (f, d) => { try { return JSON.parse(fs.readFileSync(path.join(DATA,
 const save = (f, v) => fs.writeFileSync(path.join(DATA, f), JSON.stringify(v, null, 2));
 
 const config = load('config.json', { clientId: '', tiktokUser: '', tokens: null });
-const SETTINGS = { showTop: true, showAlerts: true, showPoints: true, liveDone: false, onboarded: false }; // valores por defecto
+const SETTINGS = { showTop: true, showAlerts: true, showPoints: true, romaji: true, translate: true, liveDone: false, onboarded: false }; // valores por defecto
 config.settings = { ...SETTINGS, ...config.settings };
+config.layout = cleanLayout(config.layout); // diseño propio de la pantalla (null = el de siempre)
+config.layoutPresets = Object.fromEntries(Object.entries(config.layoutPresets || {}).map(([n, l]) => [n, cleanLayout(l)]).filter(([, l]) => l));
+const UPLOADS = path.join(DATA, 'uploads'); fs.mkdirSync(UPLOADS, { recursive: true });
 // quien ya usaba Sonando antes del tutorial no tiene que verlo
 if (config.tokens && config.settings.onboarded === false && !('onboardedSet' in config.settings)) config.settings.onboarded = true;
 const saved = load('queue.json', {});
@@ -55,7 +61,7 @@ function snapshot() {
     now: state.now, upNext: state.upNext, queue: queue.list, credits: queue.credits,
     chat: state.chat, lyrics: state.lyrics, verdict: state.verdict, judge: state.judge, score: state.score, game: gameView(), points: pointsView(), cloud: state.cloud, canLove: /user-library-modify/.test(config.tokens?.scope || ''), offset: state.offset || 0, scroll: state.scroll || 0, alerts,
     stats: state.stats, test: !!state.test, giftImgs, fx: state.fx, tiktok: state.tiktok, spotify: state.spotify,
-    build: BUILD, rules: { max: Q.MAX, nextAt: Q.NEXT_AT, step: Q.STEP }, hasClientId: !!config.clientId, settings: config.settings, dataDir: DATA, supabaseUrl: config.supabase?.url || '', redirect: REDIRECT, manual: state.spotify.premium === false,
+    build: BUILD, rules: { max: Q.MAX, nextAt: Q.NEXT_AT, step: Q.STEP }, hasClientId: !!config.clientId, settings: config.settings, layout: config.layout, dataDir: DATA, supabaseUrl: config.supabase?.url || '', hasDeepl: !!config.deeplKey, trError: state.trError || '', redirect: REDIRECT, manual: state.spotify.premium === false,
   };
 }
 function broadcast() {
@@ -124,15 +130,63 @@ async function getLyrics(track) {
     const p = new URLSearchParams({ track_name: track.name, artist_name: artist, duration: Math.round(track.durationMs / 1000) });
     let r = await fetch(`https://lrclib.net/api/get?${p}`, { headers: { 'User-Agent': 'Sonando (overlay de directos)' } });
     let j = r.ok ? await r.json() : null;
-    if (!j) {
+    if (!j?.syncedLyrics) { // sin letra, o solo sin tiempos: se busca una sincronizada que dure lo mismo
       r = await fetch(`https://lrclib.net/api/search?${new URLSearchParams({ track_name: track.name, artist_name: artist })}`, { headers: { 'User-Agent': 'Sonando (overlay de directos)' } });
-      j = r.ok ? (await r.json()).find(x => x.syncedLyrics) || null : null;
+      const list = (r.ok ? await r.json() : []).filter(x => x.syncedLyrics);
+      const off = x => Math.abs((x.duration || 0) - track.durationMs / 1000);
+      j = list.filter(x => off(x) < 8).sort((a, b) => off(a) - off(b))[0] || j || list[0] || null;
     }
     if (j?.syncedLyrics) out = { uri: track.uri, synced: true, lines: parseLrc(j.syncedLyrics) };
     else if (j?.plainLyrics) out = { uri: track.uri, synced: false, lines: j.plainLyrics.split('\n').map(text => ({ t: 0, text })) };
   } catch (e) { console.warn('letras:', e.message); }
   lyricsCache.set(track.uri, out);
   return out;
+}
+
+// Letra en otro alfabeto: primero una versión romanizada que alguien haya subido (verso por verso, con nuestros tiempos);
+// si no hay ninguna que encaje, la romanizamos aquí. Va aparte para no retrasar la letra original.
+const romanCache = new Map();
+function dictDir() {
+  if (!PACKED) return path.join(DIR, 'node_modules', 'kuromoji', 'dict');
+  const dir = path.join(DATA, 'diccionario');
+  if (!fs.existsSync(path.join(dir, 'unk_pos.dat.gz'))) { // el .exe lo lleva dentro: se saca una vez
+    fs.mkdirSync(dir, { recursive: true });
+    for (const k of sea.getAssetKeys?.() || []) if (k.startsWith('dict/')) fs.writeFileSync(path.join(dir, k.slice(5)), Buffer.from(sea.getAsset(k)));
+  }
+  return dir;
+}
+const trCache = new Map();
+async function withTr(track, lyr) {
+  if (trCache.has(track.uri)) return trCache.get(track.uri);
+  let res = null;
+  try {
+    res = await translate(lyr.lines, config.deeplKey || '');
+    state.trError = res?.error || '';
+  } catch (e) { state.trError = 'No se pudo traducir: ' + e.message; console.warn('traducir:', e.message); }
+  if (res) trCache.set(track.uri, res); // si falla no se guarda: se reintenta la próxima vez que suene
+  return res;
+}
+async function withRoman(track, lyr) {
+  if (romanCache.has(track.uri)) return romanCache.get(track.uri);
+  let res = lyr;
+  try {
+    const r = await romanize(lyr.lines, dictDir());
+    if (r.kind) {
+      // se busca con el título tal cual y con el título romanizado («夜に駆ける» → «yoru ni kakeru»)
+      const artist = track.artists.split(',')[0];
+      const title = (await romanize([{ t: 0, text: track.name }], dictDir())).lines[0].roman || track.name;
+      const cands = (await Promise.all([...new Set([track.name, title])].map(async name => {
+        try {
+          const q = await fetch(`https://lrclib.net/api/search?${new URLSearchParams({ q: `${name} ${artist}` })}`, { headers: { 'User-Agent': 'Sonando (overlay de directos)' }, signal: AbortSignal.timeout(6000) });
+          return q.ok ? (await q.json()).map(x => x.syncedLyrics || x.plainLyrics || '').filter(Boolean) : [];
+        } catch { return []; }
+      }))).flat();
+      const found = pickRomanized(r.lines, cands);
+      res = { ...lyr, lines: found || r.lines, roman: found ? 'subida' : r.kind };
+    }
+  } catch (e) { console.warn('romanizar:', e.message); }
+  romanCache.set(track.uri, res);
+  return res;
 }
 
 // ---------- reproductor: sigue a Spotify y le pasa la siguiente ----------
@@ -155,7 +209,20 @@ async function tick() {
       clearTimeout(skipTimer); state.judge = { uri: item.uri, kind: null, loved: false }; // juicio nuevo por canción
       if (owned) state.stats.songs++;
       state.lyrics = null;
-      getLyrics(state.now).then(l => { if (l.uri === state.now?.uri) { state.lyrics = l; broadcast(); } });
+      getLyrics(state.now).then(l => {
+        if (l.uri !== state.now?.uri) return;
+        state.lyrics = l; broadcast();
+        if (!l.lines.length) return;
+        // romanización y traducción a la vez; cada una se suma a la letra cuando llega (mismos versos, mismos índices)
+        let R = null, T = null;
+        const merge = () => {
+          if (state.lyrics?.uri !== l.uri) return;
+          state.lyrics = { ...l, roman: R?.roman, tr: T?.by, lines: l.lines.map((x, i) => ({ ...x, roman: R?.lines[i]?.roman, tr: T?.lines[i]?.tr })) };
+          broadcast();
+        };
+        withRoman(state.now, l).then(r => { if (r !== l) { R = r; merge(); } });
+        if (config.settings.translate) withTr(state.now, l).then(t => { if (t) { T = t; merge(); } });
+      });
     }
     if (state.now && item) Object.assign(state.now, { progressMs: p.progress_ms, isPlaying: p.is_playing, at });
 
@@ -441,7 +508,7 @@ async function connectTikTok(name) {
 }
 
 // ---------- HTTP ----------
-const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp', '.mp4': 'video/mp4', '.webm': 'video/webm', '.sql': 'text/plain; charset=utf-8' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp', '.mp4': 'video/mp4', '.webm': 'video/webm', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.sql': 'text/plain; charset=utf-8' };
 const body = req => new Promise(r => { let s = ''; req.on('data', c => s += c); req.on('end', () => { try { r(JSON.parse(s || '{}')); } catch { r({}); } }); });
 const send = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
 
@@ -467,6 +534,52 @@ const routes = {
   // ajustes: solo se aceptan las claves conocidas y valores sí/no
   // abre la carpeta donde se guarda todo (puntos, cola, configuración) en el explorador de Windows
   'POST /api/open-data': async (req, res) => { if (process.platform === 'win32') exec(`explorer "${DATA}"`); send(res, 200, { dir: DATA }); },
+  // clave de DeepL: se prueba antes de guardarla; vacía = quitarla (se traduce con Google)
+  'POST /api/deepl': async (req, res) => {
+    const key = String((await body(req)).key || '').trim();
+    if (key) {
+      try { const r = await translate([{ t: 0, text: 'hello' }], key); if (r.by !== 'deepl') throw new Error(r.error || 'DeepL no respondió'); }
+      catch (e) { return send(res, 400, { error: e.message }); }
+    }
+    config.deeplKey = key; save('config.json', config); state.trError = ''; trCache.clear(); broadcast();
+    send(res, 200, { ok: true });
+  },
+  // ---------- editor de la pantalla ----------
+  'GET /api/layouts': async (req, res) => send(res, 200, {
+    current: config.layout, builtin: PRESET_LIST.map(p => ({ ...p, layout: presetLayout(p.key) })), user: config.layoutPresets,
+    uploads: fs.readdirSync(UPLOADS).filter(f => /\.(png|jpe?g|webp|gif|svg)$/i.test(f)).sort().map(f => `/uploads/${f}`),
+  }),
+  // live: true = vista previa mientras arrastras (se muestra en el directo pero no se escribe en disco)
+  'POST /api/layout': async (req, res) => {
+    const b = await body(req);
+    config.layout = b.layout == null ? null : cleanLayout(b.layout);
+    if (!b.live) save('config.json', config);
+    broadcast(); send(res, 200, { layout: config.layout });
+  },
+  'POST /api/layout-preset': async (req, res) => {
+    const b = await body(req), name = String(b.name || '').trim().slice(0, 40);
+    if (!name) return send(res, 400, { error: 'Falta el nombre' });
+    if (b.delete) delete config.layoutPresets[name];
+    else {
+      const l = cleanLayout(b.layout);
+      if (!l) return send(res, 400, { error: 'Diseño no válido' });
+      if (!config.layoutPresets[name] && Object.keys(config.layoutPresets).length >= 30) return send(res, 400, { error: 'Máximo 30 diseños guardados' });
+      config.layoutPresets[name] = { ...l, base: undefined };
+    }
+    save('config.json', config); send(res, 200, { user: config.layoutPresets });
+  },
+  // imágenes y logos: el archivo llega tal cual en el cuerpo (máx. 10 MB) y se guarda en la carpeta de datos
+  'POST /api/upload': async (req, res, url) => {
+    const ext = path.extname(String(url.searchParams.get('name') || '')).toLowerCase();
+    if (!['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg'].includes(ext)) return send(res, 400, { error: 'Solo imágenes PNG, JPG, WebP, GIF o SVG' });
+    const chunks = []; let size = 0;
+    for await (const c of req) { size += c.length; if (size > 10 << 20) { send(res, 413, { error: 'Máximo 10 MB' }); return req.destroy(); } chunks.push(c); }
+    if (!size) return send(res, 400, { error: 'Archivo vacío' });
+    const stem = path.basename(String(url.searchParams.get('name')), ext).replace(/[^\w\-]+/g, '_').slice(0, 40) || 'imagen';
+    const file = `${stem}-${crypto.randomBytes(3).toString('hex')}${ext}`;
+    fs.writeFileSync(path.join(UPLOADS, file), Buffer.concat(chunks));
+    send(res, 200, { url: `/uploads/${file}` });
+  },
   'POST /api/settings': async (req, res) => {
     const b = await body(req);
     for (const k of Object.keys(SETTINGS)) if (typeof b[k] === 'boolean') config.settings[k] = b[k];
@@ -702,13 +815,14 @@ http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${HOST}`);
   const route = routes[`${req.method} ${url.pathname}`];
   if (route) return (async () => route(req, res, url))().catch(e => send(res, 500, { error: e.message }));
-  const page = { '/': '/home.html', '/stage': '/stage.html', '/control': '/control.html', '/top': '/top.html' }[url.pathname] || url.pathname;
+  const page = { '/': '/home.html', '/stage': '/stage.html', '/control': '/control.html', '/top': '/top.html', '/editor': '/editor.html' }[url.pathname] || url.pathname;
   const rel = path.posix.normalize(decodeURIComponent(page)).replace(/^(\.\.\/)+/, '').replace(/^\/+/, '');
   if (rel.includes('..')) { res.writeHead(403); return res.end(); }
   const type = MIME[path.extname(rel)] || 'application/octet-stream';
   // sin caché: el navegador y LIVE Studio siempre cargan la versión actual (si no, se quedan con pantallas viejas)
   const ok = buf => { res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store' }); res.end(buf); };
   const notFound = () => { res.writeHead(404); res.end('No existe'); };
+  if (rel.startsWith('uploads/')) return fs.readFile(path.join(UPLOADS, path.basename(rel)), (err, buf) => err ? notFound() : ok(buf));
   if (rel.startsWith('alerts/')) return fs.readFile(path.join(ALERTS, rel.slice(7)), (err, buf) => err ? notFound() : ok(buf));
   if (PACKED) { try { return ok(Buffer.from(sea.getAsset('public/' + rel))); } catch { return notFound(); } }
   fs.readFile(path.join(DIR, 'public', rel), (err, buf) => err ? notFound() : ok(buf));

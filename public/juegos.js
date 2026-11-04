@@ -2,11 +2,12 @@
 import { esc, avatar, icon } from '/live.js';
 
 const CSS = `
-  .stage > .game { position: absolute; z-index: 5; left: 72px; top: 236px; right: 752px; bottom: 190px; display: grid; pointer-events: none;
+  .stage .game { position: absolute; z-index: 5; left: 72px; top: 236px; right: 752px; bottom: 190px; display: grid; pointer-events: none;
     transition: opacity 380ms var(--ease-out) 140ms, transform 380ms var(--ease-out) 140ms; } /* entra cuando la letra ya se ha ido */
-  .stage > .game[hidden] { display: grid; visibility: hidden; opacity: 0; transform: translateY(16px); transition-delay: 0ms; }
+  .stage .game[hidden] { display: grid; visibility: hidden; opacity: 0; transform: translateY(16px); transition-delay: 0ms; }
   /* visibility: la letra se anima con WAAPI (opacity y filter con fill: forwards), que pisaría cualquiera de esos dos */
   .stage.gaming .lyrics, .stage.gaming .bigart, .stage.gaming .idle { visibility: hidden; }
+  .stage.custom .pc .game { left: 0; top: 0; right: 0; bottom: 0; z-index: auto; } /* con diseño propio, el recuadro lo pone la pieza */
   .g-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
   .g-head h2 { font-size: 72px; font-weight: 800; letter-spacing: -0.045em; line-height: .95; }
   .g-head p { font-size: 30px; color: var(--ink-2); margin-top: 14px; letter-spacing: -0.015em; }
@@ -84,7 +85,7 @@ function mount(st) {
   const css = document.createElement('style'); css.textContent = CSS; document.head.append(css);
   box = document.createElement('section'); box.className = 'game'; box.hidden = true; box.setAttribute('aria-live', 'polite');
   chip = document.createElement('span'); chip.className = 'testchip'; chip.hidden = true; chip.textContent = 'Modo prueba';
-  stage.append(box, chip); mounted = true;
+  (stage.querySelector('[data-pc="game"]') || stage).append(box); stage.append(chip); mounted = true;
   setInterval(tickTime, 250);
 }
 

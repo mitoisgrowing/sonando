@@ -2,7 +2,7 @@
 export function subscribe(fn) {
   // ?demo: datos inventados (capturas y enseñar Sonando sin estar en directo); no se conecta al servidor
   if (new URLSearchParams(location.search).has('demo')) {
-    import('/demo.js').then(({ demoState }) => { const s = demoState(); fn(s); setInterval(() => fn({ ...s, now: { ...s.now, at: s.now.at } }), 1500); });
+    import('/demo.js').then(({ demoState }) => { const s = demoState(); fn(s); setInterval(() => fn({ ...s, now: s.now && { ...s.now } }), 1500); });
     return { addEventListener() {} };
   }
   const es = new EventSource('/events');
@@ -38,6 +38,7 @@ export const icon = {
   up: svg('<path d="m6 15 6-6 6 6"/>'),
   home: svg('<path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1v-8.5Z"/>'),
   screen: svg('<rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M9 20h6M12 16.5V20"/>'),
+  layout: svg('<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15M9.5 11h11"/>'),
   trophy: svg('<path d="M8 4h8v5a4 4 0 0 1-8 0V4Z"/><path d="M8 6H5v1.5A3 3 0 0 0 8 10.5M16 6h3v1.5a3 3 0 0 1-3 3M12 13v4M8.5 20h7"/>'),
   send: svg('<path d="M12 19V5M6 11l6-6 6 6"/>'),
   shuffle: svg('<path d="M4 7h3.5c2 0 3.2 1 4.3 2.6l2.4 4.8c1.1 1.6 2.3 2.6 4.3 2.6H20M4 17h3.5c1.3 0 2.3-.4 3.1-1.2M14.4 8.2c.8-.8 1.8-1.2 3.1-1.2H20M17.5 4.5 20 7l-2.5 2.5M17.5 14.5 20 17l-2.5 2.5"/>'),

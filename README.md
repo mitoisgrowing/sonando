@@ -13,12 +13,15 @@
 - **Chat de TikTok en el panel.** Pulsa un mensaje (o selecciona solo el nombre de la canción) y se busca en Spotify. Añades la versión correcta a nombre de quien la pidió.
 - **Cola con reglas de donación.** Máximo 10 canciones; quien regala entra aunque esté llena. Un regalo de menos de 5 monedas sube su canción 2 puestos; 5 monedas la ponen la siguiente. Las donadas se escuchan enteras.
 - **Letra sincronizada** al estilo de las apps de música, con la portada en grande cuando no hay letra.
+- **Letra romanizada** para cantar canciones en coreano, japonés, chino, ruso… Primero busca una versión romanizada que alguien haya subido y la encaja verso por verso con los tiempos; si no la hay, la romaniza Sonando. Se puede apagar en Ajustes.
+- **Traducción al español** debajo de cada verso, más pequeña y translúcida. Con Google sin configurar nada, o con DeepL si pegas tu clave gratis. Se puede apagar en Ajustes.
 - **Veredictos con animación:** Aprobada, Meh, Saltada (con cuenta atrás de 15 s para salvarla), Salvada y Guardada en tu lista.
 - **Medidor de −50 a +50** (Basura · Flojo · Normal · Buena · Temazo) que mueves en directo. En +50 la pantalla se tiñe del color de la portada.
 - **Puntos para tu público** por escribir, pedir canciones, tus veredictos y los regalos, con top del directo y top de siempre. Cada persona se reconoce por su ID de TikTok, aunque se cambie el nombre.
 - **El fondo late con la música** (bombo y caja) y tiene modo cine.
 - **Juegos en directo:** la **ruleta** (durante el tiempo que elijas, todo lo que escriban empezando por `!` entra en la rueda, y puedes quitar pedidos) y la **batalla de canciones** (el chat vota `!1` o `!2` y tu voto cuenta la mitad; la ganadora suena la siguiente).
 - **Modo Prueba:** ensaya con chat y regalos de mentira sin tocar nada real. Al volver a Real, todo queda como estaba.
+- **Editor de pantalla** (`/editor`): mueve, redimensiona, oculta y cambia el estilo de cada parte de la pantalla del directo. Se acopla a los bordes y al centro entre piezas, tiene capas que se ordenan arrastrando, fotos y textos propios, y diseños guardados.
 - **Alertas de donación** con la foto de quien regala y la del regalo.
 - **Búsqueda de canciones, álbumes y EPs**, con «Añadir todas».
 

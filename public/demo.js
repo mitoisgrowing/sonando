@@ -23,8 +23,12 @@ const LYRICS = ['Las luces de neón se apagan al salir', 'y el eco de tu voz no 
   'la ciudad respira lento, yo respiro por ti', 'Si mañana no vuelves, guárdame la canción', 'que bailamos despacio en mitad del salón',
   '', 'Luces de neón, luces de neón', 'todo brilla más contigo en la habitación', 'Luces de neón, luces de neón', 'quédate un minuto más, quédate'];
 
+// ?demo&romaji: letra en coreano con su romanización (inventada, como el resto)
+const KO_LINES = [['밤하늘 아래 너를 불러', 'bamhaneul arae neoreul bulleo'], ['조용히 빛나는 거리', 'joyonghi binnaneun geori'], ['', ''], ['네 이름을 노래할게', 'ne ireumeul noraehalge'], ['우리 둘만의 계절', 'uri dulmanui gyejeol'], ['끝나지 않는 여름밤', 'kkeunnaji anneun yeoreumbam'], ['너와 나의 노래', 'neowa naui norae'], ['다시 한 번 불러줘', 'dasi han beon bulleojwo']];
+let KO;
 export function demoState() {
   const start = Date.now() - 52000;
+  KO = { uri: 'spotify:track:demo0', synced: true, roman: 'ko', lines: KO_LINES.map(([text, roman], i) => ({ t: 8000 + i * 4200, text, roman })) };
   const now = { ...track(0, { coins: 0 }), progressMs: Date.now() - start, isPlaying: true, at: Date.now(), owned: true };
   const points = { top: [{ id: 'demo1', nick: 'davidd', pts: 128, avatar: '' }, { id: 'demo4', nick: 'ana.beats', pts: 96, avatar: '' }, { id: 'demo2', nick: 'sofi_rk', pts: 71, avatar: '' }], pts: { demo0: 340, demo1: 128, demo2: 71, demo3: 40, demo4: 96, demo5: 22 }, names: {} };
   const chat = [
@@ -32,10 +36,11 @@ export function demoState() {
     ['demo5', 'buenas noches a todos'], ['demo4', 'satélite de nube cero'], ['demo6', 'esta canción me recuerda a verano'],
   ].map(([u, text], i) => ({ id: 'c' + i, at: Date.now() - (6 - i) * 9000, kind: 'chat', user: USERS[+u.slice(4)], text }));
   chat.push({ id: 'g1', at: Date.now() - 4000, kind: 'gift', user: USERS[4], coins: 5, count: 5, gift: 'Rosa', image: '/img/rosa.png', text: '5× Rosa', moved: true, to: 0 });
+  const idle = new URLSearchParams(location.search).has('idle'); // ?demo&idle: pantalla en espera
   return {
-    build: 'demo', now, upNext: null,
+    build: 'demo', now: idle ? null : now, upNext: null,
     queue: [track(3, { coins: 5, user: USERS[4] }), track(1, { user: USERS[1] }), track(2, { user: USERS[2] }), track(4), track(5), track(6), track(7), track(8)],
-    credits: {}, chat, lyrics: { uri: now.uri, synced: true, lines: LYRICS.map((text, i) => ({ t: 8000 + i * 4200, text })) },
+    credits: {}, chat, lyrics: new URLSearchParams(location.search).has('romaji') ? KO : { uri: now.uri, synced: true, lines: LYRICS.map((text, i) => ({ t: 8000 + i * 4200, text })) },
     tiktok: { status: 'on', user: 'tu_canal', error: '' }, spotify: { status: 'ok', error: '' }, manual: false,
     rules: { max: 10, nextAt: 5, step: 2 }, hasClientId: true, settings: { showTop: true, showAlerts: true, showPoints: true, liveDone: true, onboarded: true },
     supabaseUrl: '', redirect: 'http://127.0.0.1:5190/callback', verdict: null, judge: { uri: now.uri, kind: 'liked', loved: true },

@@ -87,7 +87,7 @@
   .col > header { padding: 22px 24px 14px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
   .col h2 { font-size: 16px; font-weight: 700; letter-spacing: -0.015em; }
   .col h2 + span { color: var(--ink-3); font-size: 13px; }
-  .scroll { overflow: auto; min-height: 0; padding: 0 14px 20px; scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / .14) transparent; }
+  .scroll { overflow: auto; min-height: 0; padding: 0 14px 20px; }
 
   .av { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; flex: none; }
 
@@ -348,7 +348,7 @@ const HOST_USER = { id: '__host', nick: 'Tú', avatar: '' };
 let S = null, requester = HOST_USER, picked = null, results = [], note = null, searching = false, midMode = '';
 $('brandIcon').innerHTML = '<img src="/img/logo.svg" alt="" width="24" height="24" style="display:block">';
 $('setBtn').innerHTML = `${icon.gear}Ajustes`;
-$('nav').innerHTML = `<a href="/">${icon.home}Inicio</a><a href="/stage" target="_blank">${icon.screen}Pantalla del directo</a><a href="/top" target="_blank">${icon.trophy}Top</a>`;
+$('nav').innerHTML = `<a href="/">${icon.home}Inicio</a><a href="/stage" target="_blank">${icon.screen}Pantalla del directo</a><a href="/editor" target="_blank">${icon.layout}Editor</a><a href="/top" target="_blank">${icon.trophy}Top</a>`;
 
 const api = async (url, data) => {
   const r = await fetch(url, data === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });

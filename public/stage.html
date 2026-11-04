@@ -6,6 +6,7 @@
 <title>Sonando</title>
 <link rel="icon" href="/img/logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/base.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Pacifico&family=Playfair+Display:wght@400..900&family=Space+Mono:wght@400;700&display=swap">
 <style>
   html, body { height: 100%; overflow: hidden; background: #000; }
 
@@ -39,6 +40,34 @@
       rgb(8 6 10 / .28);
   }
   .stage > :not(.bg, .toast, .verdict, .fx-flash, .bars, .fin, .finword) { position: relative; z-index: 3; }
+  .pc > :not(.toast, .game) { position: relative; z-index: 3; }
+
+  /* Piezas: en el diseño de siempre su contenedor no existe (display: contents) y la cuadrícula manda.
+     Con un diseño propio (.custom) cada pieza es un rectángulo absoluto: sus medidas, escala y estilo los pone el script. */
+  .pc { display: contents; }
+  .stage.custom { display: block; padding: 0; transition: none; }
+  .stage.custom > .pc { display: block; position: absolute; transform-origin: 0 0; }
+  .stage.custom .pc > :not(.toast, .game) { width: 100%; height: 100%; margin: 0; z-index: auto; }
+  .stage.custom .toast { left: 0; top: 0; margin-left: 0; }
+  .stage.custom .side { min-height: 0; }
+  .stage.custom .pc[data-join] > :not(.toast, .game) { height: var(--sh); }
+  .stage.custom .side, .stage.custom .top { background: none; box-shadow: none; border-radius: 0; }
+  .stage.custom .top { margin: 0; padding: 26px 30px; }
+  .stage.custom .top h3 { margin-bottom: 12px; }
+  .stage.custom .idle { display: none; }
+  .stage.custom.empty .idle { display: flex; flex-direction: column; justify-content: center; }
+  .stage.custom .lyrics { padding: 0; }
+  .stage.custom .bigart { padding: 0; }
+  .stage.custom .ex { display: block; position: absolute; transform-origin: 0 0; }
+  .stage:not(.custom) .ex { display: none; }
+  /* una pieza con fondo propio no deja un recuadro vacío cuando lo que lleva dentro no se ve */
+  .stage.custom .pc:has(> .top[hidden]), .stage.custom .pc:has(> .game[hidden]), .stage.custom .pc:has(> .meter:not(.on)),
+  .stage.custom.empty .pc[data-pc="np"], .stage.custom.empty .pc[data-pc="lyrics"], .stage.custom:not(.empty) .pc[data-pc="idle"] { display: none; }
+  .stage.custom.gaming .pc[data-pc="lyrics"], .stage.custom.gaming .pc[data-pc="idle"] { visibility: hidden; }
+  .xt { font-weight: 760; letter-spacing: -0.03em; line-height: 1.1; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .ex img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+  /* fondo propio: el desenfoque de la portada se apaga */
+  .stage[data-bg=solid] .bg, .stage[data-bg=transparent] .bg, .stage[data-bg=image] .bg { display: none; }
 
   /* Ritmo: el fondo late con los graves; en modo cine o en el drop, más fuerte y con franjas */
   .bg { will-change: transform; }
@@ -118,6 +147,9 @@
     transition: opacity 500ms ease, transform 620ms var(--ease-drawer), filter 500ms ease;
   }
   .line.on { opacity: 1; transform: none; filter: none !important; }
+  /* traducción debajo de cada verso: más pequeña y más translúcida (se suma a la opacidad del verso) */
+  .line .tr { display: block; margin-top: 10px; font-size: .44em; font-weight: 600; letter-spacing: -0.012em; line-height: 1.2; opacity: .58; }
+  .lines.plain .line .tr { font-size: .5em; }
   .line.past { opacity: .22; }
   .line.gap { display: flex; gap: 22px; height: 90px; align-items: center; margin-bottom: 34px; }
   .line.gap i { width: 24px; height: 24px; border-radius: 50%; background: currentColor; opacity: .5; }
@@ -242,9 +274,9 @@
 
   /* Veredicto: suspense (círculo que piensa) y luego se transforma en el resultado */
   /* centrado sobre la letra (columna de la música), no sobre la cola */
-  .verdict { --vx: calc((var(--w, 1920px) - 680px) / 2); position: absolute; inset: 0; z-index: 6; pointer-events: none; visibility: hidden; }
+  .verdict { --vx: var(--vcx, calc((var(--w, 1920px) - 680px) / 2)); position: absolute; inset: 0; z-index: 6; pointer-events: none; visibility: hidden; }
   .verdict.run { visibility: visible; }
-  .v-core { position: absolute; left: var(--vx); top: 50%; width: 150px; height: 150px; margin: -75px 0 0 -75px; border-radius: 75px;
+  .v-core { position: absolute; left: var(--vx); top: var(--vcy, 50%); width: 150px; height: 150px; margin: -75px 0 0 -75px; border-radius: 75px;
     display: flex; align-items: center; justify-content: center; gap: 26px; overflow: hidden;
     background: rgb(255 255 255 / .1); backdrop-filter: blur(24px); box-shadow: inset 0 0 0 2px rgb(255 255 255 / .18); opacity: 0; }
   .v-fill { position: absolute; inset: 0; clip-path: circle(0% at 50% 50%); }
@@ -261,7 +293,7 @@
   .v-word { position: relative; display: none; font-size: 104px; font-weight: 840; letter-spacing: -0.045em; color: #fff; white-space: nowrap; }
   .v-word i { display: inline-block; font-style: normal; opacity: 0; }
   .save .v-spark { background: oklch(0.88 0.1 240); }
-  .v-spark { position: absolute; left: var(--vx); top: 50%; width: 14px; height: 14px; margin: -7px; border-radius: 50%; background: oklch(0.9 0.14 150); }
+  .v-spark { position: absolute; left: var(--vx); top: var(--vcy, 50%); width: 14px; height: 14px; margin: -7px; border-radius: 50%; background: oklch(0.9 0.14 150); }
 
   @media (prefers-reduced-motion: reduce) {
     .blob { animation: none; }
@@ -274,58 +306,224 @@
 <main class="stage empty" id="stage">
   <div class="bg" id="bg"></div>
 
-  <section class="np">
+  <div class="pc" data-pc="np"><section class="np">
     <img class="art" id="art" alt="">
     <div>
       <div class="trow"><h1 class="title" id="title"></h1><span class="badges" id="badges"></span></div>
       <p class="artist" id="artist"></p>
       <p class="by" id="by"></p>
     </div>
-  </section>
+  </section></div>
 
-  <section class="lyrics" id="lyrics"><div class="lines" id="lines"></div></section>
-  <div class="bigart"><img id="bigart" alt=""></div>
+  <div class="pc" data-pc="lyrics">
+    <section class="lyrics" id="lyrics"><div class="lines" id="lines"></div></section>
+    <div class="bigart"><img id="bigart" alt=""></div>
+  </div>
 
-  <section class="idle">
+  <div class="pc" data-pc="idle"><section class="idle">
     <h1>Pide tu canción en el chat</h1>
     <p>Escribe el nombre y el artista. La pongo y reaccionamos juntos.</p>
-  </section>
+  </section></div>
 
-  <aside class="side">
+  <div class="pc" data-pc="queue"><aside class="side">
     <h2>A continuación <span class="num" id="count"></span></h2>
     <ol class="q" id="queue"></ol>
     <div class="top" id="top" hidden><h3>Top del directo</h3><ol id="topList"></ol></div>
-  </aside>
+  </aside></div>
+  <div class="pc" data-pc="top"></div>
 
   <div class="fin" id="fin" aria-hidden="true"><div class="tint"></div><div class="rays"></div></div>
   <div class="finword" id="finword" aria-hidden="true"><b>+50</b><span>TEMAZO</span></div>
-  <div class="meter" id="meter" aria-hidden="true">
+  <div class="pc" data-pc="meter"><div class="meter" id="meter" aria-hidden="true">
     <div class="rail"><div class="grad" id="mgrad"></div><div class="ticks"></div><div class="mid"></div></div>
     <div class="knob" id="mknob"><span><b id="mval">0</b><small id="mlab">Normal</small></span></div>
     <div class="labels"><span>−50 · Basura</span><span>−25 · Flojo</span><span>0 · Normal</span><span>+25 · Buena</span><span>+50 · Temazo</span></div>
-  </div>
-  <div class="bar num"><span id="cur">0:00</span><div class="track"><div class="fill" id="fill"></div></div><span id="dur">0:00</span></div>
+  </div></div>
+  <div class="pc" data-pc="bar"><div class="bar num"><span id="cur">0:00</span><div class="track"><div class="fill" id="fill"></div></div><span id="dur">0:00</span></div></div>
 
   <div class="fx-flash" id="flash"></div>
   <div class="bars" aria-hidden="true"><i></i><i></i></div>
-  <div class="toast" id="toast" role="status"></div>
+  <div class="pc" data-pc="toast"><div class="toast" id="toast" role="status"></div></div>
+  <div class="pc" data-pc="game"></div>
   <div class="verdict" id="verdict" aria-live="polite"></div>
 </main>
 
 <script type="module">
 import { subscribe, progressOf, fmt, esc, icon, avatar, flip } from '/live.js';
 import { initGames, renderGame } from '/juegos.js';
+import { PIECE_IDS, FONTS, toastAnchor } from '/layout.js';
 
 const $ = id => document.getElementById(id);
 const stage = $('stage');
 let scale = 1;
 // Diseñado a 1920 de ancho; se escala y estira para llenar siempre la ventana entera, sin bandas
+// Con un diseño propio el lienzo tiene medidas fijas (p. ej. 1920×1080 o 1080×1920) y se centra sin deformarse
 const fit = () => {
-  scale = Math.min(innerWidth / 1920, innerHeight / 900);
-  stage.style.cssText = `--s:${scale};--w:${innerWidth / scale}px;--h:${innerHeight / scale}px`;
+  const c = layout?.canvas, st = stage.style;
+  if (c) {
+    scale = Math.min(innerWidth / c.w, innerHeight / c.h);
+    st.setProperty('--w', `${c.w}px`); st.setProperty('--h', `${c.h}px`);
+    st.left = `${(innerWidth - c.w * scale) / 2}px`; st.top = `${(innerHeight - c.h * scale) / 2}px`;
+  } else {
+    scale = Math.min(innerWidth / 1920, innerHeight / 900);
+    st.setProperty('--w', `${innerWidth / scale}px`); st.setProperty('--h', `${innerHeight / scale}px`); st.left = st.top = '';
+  }
+  st.setProperty('--s', scale);
 };
-addEventListener('resize', fit); fit();
+addEventListener('resize', fit);
 
+// ---------- diseño propio (editor) ----------
+// layout = null → la cuadrícula de siempre. En /stage?edit (dentro del editor) el diseño llega por postMessage, no por el servidor.
+const EDIT = new URLSearchParams(location.search).has('edit');
+let layout = null, layoutSig = 'x', editLayout = null, toastF = 0.5;
+const pcEl = Object.fromEntries(PIECE_IDS.map(id => [id, document.querySelector(`.pc[data-pc="${id}"]`)]));
+const hexA = (h, a) => `rgb(${parseInt(h.slice(1, 3), 16)} ${parseInt(h.slice(3, 5), 16)} ${parseInt(h.slice(5, 7), 16)} / ${a})`;
+// cola y top pegados (mismo ancho, uno justo debajo del otro, los dos con fondo) son UN solo panel: lo pinta el de arriba
+// con la altura de los dos y el otro va encima sin fondo, así no queda ninguna línea en la unión
+function joins() {
+  const P = layout?.pieces, q = P?.queue, t = P?.top;
+  if (!q || !t || q.hidden || t.hidden || !q.bg || !t.bg || !q.bgA || !t.bgA || (q.size || 100) !== (t.size || 100)) return null;
+  if (Math.abs(q.x - t.x) > 2 || Math.abs(q.w - t.w) > 2) return null;
+  if (Math.abs(q.y + q.h - t.y) <= 2) return { o: 'queue', p: 'top' };
+  if (Math.abs(t.y + t.h - q.y) <= 2) return { o: 'top', p: 'queue' };
+  return null;
+}
+function paint(el, p) {
+  const st = el.style;
+  st.opacity = p.opacity == null ? '' : p.opacity / 100;
+  st.borderRadius = p.radius ? `${p.radius}px` : '';
+  const bg = p.bg && p.bgA;
+  st.background = bg ? hexA(p.bg, p.bgA / 100) : '';
+  st.boxShadow = bg ? 'inset 0 0 0 1px rgb(255 255 255 / .07)' : '';
+  st.overflow = p.radius && (bg || p.kind === 'image') ? 'hidden' : ''; // las esquinas redondeadas también recortan la imagen
+  st.filter = p.shadow ? `drop-shadow(0 ${p.shadow * 0.16}px ${p.shadow * 0.5}px rgb(0 0 0 / ${Math.min(0.85, 0.25 + p.shadow / 130)}))` : '';
+  st.visibility = p.hidden ? 'hidden' : '';
+  for (const [v, a] of [['--ink', 1], ['--ink-2', 0.62], ['--ink-3', 0.52]]) {
+    if (p.color) st.setProperty(v, a === 1 ? p.color : `color-mix(in srgb, ${p.color} ${a * 100}%, transparent)`); else st.removeProperty(v);
+  }
+  st.color = p.color || '';
+}
+function place(el, p, k, z) {
+  const st = el.style;
+  st.left = `${p.x}px`; st.top = `${p.y}px`; st.width = `${p.w / k}px`; st.height = `${p.h / k}px`; st.scale = k === 1 ? '' : k; st.zIndex = z;
+}
+function useLayout(L) {
+  const sig = JSON.stringify(L || null);
+  if (sig === layoutSig) return false; layoutSig = sig;
+  layout = L || null;
+  stage.classList.toggle('custom', !!layout);
+  // el top vive dentro de la cola en el diseño de siempre; con diseño propio es una pieza aparte
+  const top = $('top'), home = document.querySelector('.side'), dest = layout ? pcEl.top : home;
+  if (top.parentElement !== dest) dest.append(top);
+  // fondo
+  const b = layout?.bg || { mode: 'album' };
+  stage.dataset.bg = b.mode;
+  stage.style.background = b.mode === 'solid' ? b.color : b.mode === 'transparent' ? 'transparent' : b.mode === 'image' ? `#000 url(${b.image}) center / cover no-repeat` : '';
+  document.documentElement.style.background = document.body.style.background = b.mode === 'transparent' ? 'transparent' : '';
+  // piezas
+  const z = id => 3 + (layout?.order.indexOf(id) ?? 0), k = p => (p.size || 100) / 100, J = joins(), P = layout?.pieces;
+  for (const id of PIECE_IDS) {
+    const el = pcEl[id], p = layout?.pieces[id];
+    if (!layout) { el.removeAttribute('style'); continue; }
+    if (id === 'toast') {
+      const a = toastAnchor(p.pos, layout.canvas.w, layout.canvas.h); toastF = a.f;
+      Object.assign(el.style, { left: `${a.tx}px`, top: `${a.ty}px`, width: '0px', height: '0px', scale: k(p) === 1 ? '' : k(p), zIndex: z(id) });
+    } else place(el, p, k(p), z(id));
+    if (J && (id === J.o || id === J.p)) {
+      const q = P[J.p], o = P[J.o], kk = k(o), zz = [z(J.o), z(J.p)];
+      if (id === J.o) { const top = Math.min(o.y, q.y); el.style.top = `${top}px`; el.style.height = `${(o.h + q.h) / kk}px`; el.style.setProperty('--sh', `${o.h / kk}px`); el.dataset.join = '1'; }
+      el.style.zIndex = id === J.o ? Math.min(...zz) : Math.max(...zz);
+      paint(el, id === J.p ? { ...p, bg: undefined, radius: 0 } : p);
+    } else { el.removeAttribute('data-join'); el.style.removeProperty('--sh'); paint(el, p); }
+  }
+  if (!layout) toastF = 0.5;
+  // el sello del veredicto se centra sobre la letra
+  const ly = layout?.pieces.lyrics;
+  if (ly && !ly.hidden) { stage.style.setProperty('--vcx', `${ly.x + ly.w / 2}px`); stage.style.setProperty('--vcy', `${ly.y + ly.h / 2}px`); }
+  else if (layout) { stage.style.setProperty('--vcx', `${layout.canvas.w / 2}px`); stage.style.setProperty('--vcy', `${layout.canvas.h / 2}px`); }
+  else { stage.style.removeProperty('--vcx'); stage.style.removeProperty('--vcy'); }
+  // imágenes y textos libres
+  const have = new Map([...stage.querySelectorAll(':scope > .ex')].map(el => [el.dataset.id, el]));
+  for (const e of layout?.extras || []) {
+    let el = have.get(e.id); have.delete(e.id);
+    if (!el) {
+      el = document.createElement('div'); el.className = 'pc ex'; el.dataset.id = e.id;
+      el.append(e.kind === 'image' ? Object.assign(document.createElement('img'), { alt: '', src: e.src }) : Object.assign(document.createElement('div'), { className: 'xt' }));
+      stage.append(el);
+    }
+    const inner = el.firstElementChild;
+    if (e.kind === 'text') { if (inner.textContent !== e.text) inner.textContent = e.text; const s = inner.style; s.fontSize = `${e.size}px`; s.fontFamily = FONTS[e.font || 'inter'].css; s.fontWeight = e.weight || '';
+      s.textAlign = e.align || ''; s.letterSpacing = e.ls == null ? '' : `${e.ls / 100}em`; }
+    else if (inner.getAttribute('src') !== e.src) inner.src = e.src;
+    place(el, e, 1, z(e.id)); paint(el, e);
+  }
+  for (const el of have.values()) el.remove();
+  fit();
+  active = -1; queueSig = ''; // la letra y la cola se recolocan con las medidas nuevas
+  return true;
+}
+// Con diseño propio, el aviso aparta lo que tapa (como el diseño de siempre, que baja todo): las piezas bajas se desplazan
+// y las altas (letra, cola) se acortan por el lado del aviso, siempre dejando 24 px libres y sin solaparse entre sí.
+let squeezed = false, lastShown = 3;
+function squeezePlan() {
+  const P = layout.pieces, W = layout.canvas.w, H = layout.canvas.h, T = P.toast, GAP = 24;
+  const { tx, ty, f } = toastAnchor(T.pos, W, H), k = (T.size || 100) / 100, zw = Math.min(1100, W - 80) * k;
+  const up = T.pos.startsWith('bottom'), z0 = tx - f * zw, z1 = z0 + zw;
+  // en coordenadas «hacia abajo»: si el aviso está abajo se refleja todo
+  const fy = (y, h) => up ? H - y - h : y;
+  const zt = up ? H - (ty + 138 * k) : ty, zb = (up ? H - ty : ty + 138 * k) + GAP; // franja del aviso y borde que hay que despejar
+  const ids = PIECE_IDS.filter(id => id !== 'toast' && !P[id].hidden && pcEl[id].offsetParent);
+  const O = Object.fromEntries(ids.map(id => [id, { x0: P[id].x, x1: P[id].x + P[id].w, y: fy(P[id].y, P[id].h), h: P[id].h }]));
+  const R = structuredClone(O), moved = new Set();
+  const need = (id) => {
+    let want = -Infinity; const p = R[id];
+    if (p.x0 < z1 && z0 < p.x1 && p.y < zb && p.y + p.h > zt) want = zb;
+    for (const q of moved) if (q !== id && p.x0 < R[q].x1 && R[q].x0 < p.x1 && O[id].y >= O[q].y && O[id].y < O[q].y + O[q].h + 200 && p.y < R[q].y + R[q].h + 12)
+      want = Math.max(want, R[q].y + R[q].h + Math.max(0, O[id].y - (O[q].y + O[q].h)));
+    return want;
+  };
+  for (let n = 0; n < 8; n++) {
+    let any = false;
+    for (const id of ids) {
+      const w = need(id), p = R[id]; if (w === -Infinity || p.y >= w) continue;
+      const d = w - p.y; any = true; moved.add(id);
+      if (O[id].h >= 300) { p.y += d; p.h = Math.max(160, p.h - d); } else p.y += d;
+    }
+    if (!any) break;
+  }
+  return Object.fromEntries([...moved].map(id => [id, { y: up ? H - R[id].y - R[id].h : R[id].y, h: R[id].h }]));
+}
+let squeezeT, resetT;
+function alertSqueeze(on) {
+  if (!layout) return;
+  clearTimeout(squeezeT); clearInterval(resetT);
+  const plan = on ? squeezePlan() : {}, E = 'cubic-bezier(0.65, 0, 0.35, 1)', J = joins();
+  for (const id of PIECE_IDS) {
+    if (id === 'toast') continue;
+    const el = pcEl[id], p = layout.pieces[id], k = (p.size || 100) / 100, t = plan[id];
+    el.style.transition = `top 640ms ${E}, height 640ms ${E}`;
+    // un panel unido (cola + top): el de arriba lleva a los dos; si el aviso aparta a uno se mueve el conjunto por el que lo toca
+    const own = J && id === J.o ? layout.pieces[J.p] : null;
+    const y = t ? t.y : p.y, h = t ? t.h : p.h;
+    el.style.top = `${own ? Math.min(y, plan[J.p]?.y ?? own.y) : y}px`;
+    el.style.height = `${(own ? h + (plan[J.p]?.h ?? own.h) : h) / k}px`;
+    if (own) el.style.setProperty('--sh', `${h / k}px`);
+  }
+  squeezed = on;
+  resetT = setInterval(() => { active = -1; }, 60); // la letra se recoloca mientras cambia de alto
+  squeezeT = setTimeout(() => { clearInterval(resetT); active = -1; for (const id of PIECE_IDS) if (id !== 'toast') pcEl[id].style.transition = ''; }, 740);
+}
+const lyricsHidden = () => !!layout?.pieces.lyrics.hidden;
+if (EDIT) {
+  addEventListener('message', e => {
+    if (e.origin !== location.origin) return;
+    if (e.data?.type === 'layout') { editLayout = e.data.layout; if (S) render(); }
+    if (e.data?.type === 'toast' && S) showToast({ id: 'edit' + Date.now(), kind: 'gift', user: S.queue[0]?.user || { id: 'x', nick: 'luna.mp3' }, coins: 5, count: 5, gift: 'Rosa', image: '/img/rosa.png', text: '5× Rosa', moved: true, to: 0 }, true);
+  });
+  parent.postMessage({ type: 'ready' }, location.origin);
+}
+
+fit();
 let S = null, lyricsUri = null, queueSig = '', lastArt = null, active = -1, seenChat = new Set(), firstState = true;
 const LEAD = 250; // Spotify informa el progreso con algo de retraso
 
@@ -343,6 +541,7 @@ function setBackground(url) {
 }
 
 function render() {
+  useLayout(EDIT ? editLayout : S.layout);
   const now = S.now;
   stage.classList.toggle('empty', !now);
   setBackground(now?.art || S.queue[0]?.art || null);
@@ -357,7 +556,7 @@ function render() {
 
   // cola: la que ya está en camino (bloqueada) + las que quepan
   const items = [...(S.upNext ? [{ ...S.upNext, locked: true }] : []), ...S.queue];
-  const total = items.length, shown = Math.max(3, Math.floor(($('queue').clientHeight + 18) / 98) - (total > 1 ? 1 : 0));
+  const total = items.length, shown = squeezed ? lastShown : (lastShown = Math.max(3, Math.floor(($('queue').clientHeight + 18) / 98) - (total > 1 ? 1 : 0)));
   $('count').textContent = total ? `${total} en cola` : '';
   renderQueue(items, shown, total);
 
@@ -413,13 +612,13 @@ function syncLyrics(animate) {
   const now = S.now; if (!now || changing) return;
   const loaded = S.lyrics?.uri === now.uri;
   const key = loaded ? now.uri : `loading:${now.uri}`;
-  const wantCover = loaded && !S.lyrics.lines.length;
+  const wantCover = loaded && !S.lyrics.lines.length && !lyricsHidden();
   if (key !== lyricsUri) {
     lyricsUri = key; renderLyrics();
     if (loaded && S.lyrics.lines.length) [...$('lines').children].slice(0, 9).forEach((el, k) =>
       el.animate([{ translate: '0 22px', filter: 'blur(8px)', opacity: 0 }, { translate: '0 0', filter: 'blur(0)' }],
         { duration: 620, delay: 60 + k * 45, easing: E_OUT, fill: 'backwards', composite: 'replace' }));
-  }
+  } else swapRoman();
   if (wantCover !== coverOn) setCover(wantCover, animate);
 }
 
@@ -757,7 +956,7 @@ function playVerdict(kind) {
 // Donaciones: una isla negra arriba en el centro que se expande, enseña quién y qué, y se recoge. En fila si llegan varias.
 const pending = [];
 let alerting = false;
-function showToast(m) { if (S.settings?.showAlerts === false) return; pending.push(m); if (!alerting) nextAlert(); } // se puede apagar en Ajustes
+function showToast(m, force) { if ((S.settings?.showAlerts === false || layout?.pieces.toast.hidden) && !force) return; pending.push(m); if (!alerting) nextAlert(); } // se puede apagar en Ajustes
 async function nextAlert() {
   const m = pending.shift();
   if (!m) { alerting = false; return; }
@@ -769,21 +968,34 @@ async function nextAlert() {
   t.innerHTML = `<div class="in">${avatar(m.user, 86)}<div class="txt"><div class="who"><span>${esc(m.user.nick)}</span><span class="amt num"><img src="/img/moneda.png" alt="">${m.coins} ${m.coins === 1 ? 'moneda' : 'monedas'}</span></div>
     <div class="gift">Ha donado <b>${m.count || 1}${m.image ? `<img class="gimg" src="${esc(m.image)}" alt="">` : ' '}${esc(m.gift || m.text)}</b> · ${what}</div></div></div>`;
   const inner = t.firstChild;
-  const w = Math.min(1100, inner.scrollWidth), h = 138;
+  const w = Math.min(1100, layout ? layout.canvas.w - 80 : 1920, inner.scrollWidth), h = 138;
   const SPRING = 'cubic-bezier(0.32, 1.25, 0.5, 1)', E = 'cubic-bezier(0.23, 1, 0.32, 1)';
-  const pill = { width: '230px', height: '64px', marginLeft: '-115px' };
-  const open = { width: `${w}px`, height: `${h}px`, marginLeft: `${-w / 2}px` };
-  stage.classList.add('alerting');
+  const pill = { width: '230px', height: '64px', marginLeft: `${-toastF * 230}px` };
+  const open = { width: `${w}px`, height: `${h}px`, marginLeft: `${-toastF * w}px` };
+  if (!layout) stage.classList.add('alerting'); else alertSqueeze(true);
   t.animate([{ opacity: 0, transform: 'scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: E, fill: 'forwards' });
   t.animate([pill, open], { duration: 640, delay: 140, easing: SPRING, fill: 'forwards' });
   inner.animate([{ opacity: 0, filter: 'blur(6px)', transform: 'scale(.96)' }, { opacity: 1, filter: 'none', transform: 'none' }], { duration: 380, delay: 380, easing: E, fill: 'forwards' });
   setTimeout(() => {
     inner.animate([{ opacity: 1 }, { opacity: 0, filter: 'blur(4px)' }], { duration: 180, fill: 'forwards' });
     t.animate([open, pill], { duration: 420, delay: 120, easing: E, fill: 'forwards' });
-    t.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, delay: 520, fill: 'forwards' }).finished.then(() => { if (!pending.length) stage.classList.remove('alerting'); setTimeout(nextAlert, 250); });
+    t.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, delay: 520, fill: 'forwards' }).finished.then(() => { if (!pending.length) { stage.classList.remove('alerting'); alertSqueeze(false); } setTimeout(nextAlert, 250); });
   }, 4600);
 }
 
+// letra romanizada (coreano, japonés, chino…) y traducción al español, si están activadas en Ajustes.
+// Llegan un poco después que la original y se cambian en su sitio, sin volver a pintar la letra.
+const useRoman = () => S.settings?.romaji !== false, useTr = () => S.settings?.translate !== false;
+const lineText = l => (useRoman() && l.roman) || l.text;
+const lineHtml = l => esc(lineText(l)) + (useTr() && l.tr ? `<span class="tr">${esc(l.tr)}</span>` : '');
+const romanOf = L => [L?.roman, L?.tr, useRoman(), useTr()].join('|');
+let romanKey = '';
+function swapRoman() {
+  const L = S.lyrics; if (!L || L.uri !== S.now?.uri || romanOf(L) === romanKey) return;
+  romanKey = romanOf(L);
+  [...$('lines').children].forEach((el, i) => { if (L.lines[i]?.text) el.innerHTML = lineHtml(L.lines[i]); });
+  active = -1; // los versos cambian de alto: que la letra se recoloque
+}
 function renderLyrics() {
   const now = S.now, L = S.lyrics, box = $('lines');
   active = -1; box.style.transform = '';
@@ -791,16 +1003,17 @@ function renderLyrics() {
   $('lyrics').querySelector('.note')?.remove();
   if (!now || L?.uri !== now.uri) { box.innerHTML = ''; return; }
   if (!L.lines.length) { box.innerHTML = ''; return; }
+  romanKey = romanOf(L);
   box.innerHTML = L.lines.map(l => l.text
-    ? `<p class="line">${esc(l.text)}</p>`
+    ? `<p class="line">${lineHtml(l)}</p>`
     : `<p class="line gap" aria-hidden="true"><i></i><i></i><i></i></p>`).join('');
 }
 
 // bucle de animación: progreso y línea activa
 // M: volver al menú de inicio (sin botón visible: esta pantalla sale en el directo)
-addEventListener('keydown', e => { if (e.key.toLowerCase() === 'm' && !e.ctrlKey && !e.metaKey && !e.altKey) location.href = '/'; });
+addEventListener('keydown', e => { if (!EDIT && e.key.toLowerCase() === 'm' && !e.ctrlKey && !e.metaKey && !e.altKey) location.href = '/'; });
 addEventListener('wheel', e => {
-  if (!S?.lyrics || S.lyrics.synced) return;
+  if (EDIT || !S?.lyrics || S.lyrics.synced) return;
   fetch('/api/scroll', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delta: e.deltaY / scale * 0.6 }) });
 }, { passive: true });
 

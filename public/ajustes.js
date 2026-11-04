@@ -9,6 +9,7 @@ const sb = { url: '', key: '', test: null, sql: '' };
 const E_DRAWER = 'cubic-bezier(0.32, 0.72, 0, 1)';
 
 const CSS = `
+  .drawer { overflow-x: hidden; } .drawer code { overflow-wrap: anywhere; word-break: break-all; }
   .scrim { position: fixed; inset: 0; z-index: 40; background: rgb(0 0 0 / .5); opacity: 0; transition: opacity 260ms ease; }
   .scrim.on { opacity: 1; }
   .drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 41; width: min(440px, 100vw); overflow: auto;
@@ -181,10 +182,18 @@ function renderDrawer() {
       <div class="row"><input id="dSbKey" placeholder="Clave (sb_publishable_… o sb_secret_…)" autocomplete="off" spellcheck="false"><button class="btn" data-act="dsb">Conectar</button></div>
       <div class="row"><button class="btn" data-act="sql">Copiar SQL de las tablas</button>${S.supabaseUrl ? '<button class="btn" data-act="sboff">Desconectar</button>' : ''}</div>
     </div>
+    <h3>Traducción de la letra</h3>
+    <div class="set">
+      ${tg('translate', 'Traducción al español', 'Debajo de cada verso, más pequeña. Si la canción ya está en español no sale')}
+      <p>${S.trError ? '<span class="err">' + esc(S.trError).slice(0, 160) + '</span> · mientras, traduce Google' : S.hasDeepl ? 'Traduciendo con DeepL (tu clave).' : 'Traduce Google, sin configurar nada. Con una clave gratis de DeepL la traducción es mejor (500.000 caracteres al mes, unas 300 canciones).'}</p>
+      <div class="row"><input id="dDeepl" placeholder="${S.hasDeepl ? 'Clave de DeepL guardada (pega otra para cambiarla)' : 'Clave de DeepL (opcional)'}" autocomplete="off" spellcheck="false"><button class="btn" data-act="deepl">Guardar</button></div>
+      <p id="dDeeplMsg">${S.hasDeepl ? '<button class="btn" data-act="deeploff">Quitar clave</button> · ' : ''}<a class="link" href="https://www.deepl.com/pro-api" target="_blank" rel="noreferrer">Conseguir clave gratis</a> (DeepL API Free)</p>
+    </div>
     <h3>Pantalla del directo</h3>
     <div class="set">
       ${tg('showTop', 'Top 3 del directo', 'Quién lleva más puntos, debajo de la cola')}
       ${tg('showAlerts', 'Notificaciones de donación', 'La isla negra de arriba cuando alguien regala')}
+      ${tg('romaji', 'Letra romanizada', 'Canciones en coreano, japonés, chino, ruso… en letras latinas, para poder cantarlas')}
       ${tg('showPoints', 'Puntos en el chat', 'Los puntos de cada uno junto a su nombre en este panel')}
     </div>
     <h3>Tus datos</h3>
@@ -231,6 +240,13 @@ async function onAct(e) {
     $('tBody').dataset.sig = ''; renderTour();
   }
   else if (a === 'dsb') { await saveSupabase($('dSbUrl').value, $('dSbKey').value); $('dSbKey').value = ''; }
+  else if (a === 'deepl' || a === 'deeploff') {
+    const key = a === 'deepl' ? $('dDeepl').value.trim() : '';
+    if (a === 'deepl' && !key) return;
+    b.disabled = true; const old = b.textContent; b.textContent = 'Comprobando…';
+    try { await api('/api/deepl', { key }); if ($('dDeepl')) $('dDeepl').value = ''; $('drawer').dataset.sig = ''; renderDrawer(); }
+    catch (err) { b.disabled = false; b.textContent = old; $('dDeeplMsg').innerHTML = `<span class="err">${esc(err.message)}</span>`; }
+  }
   else if (a === 'sboff') await api('/api/supabase', { url: '', key: '' });
   else if (a === 'opendata') api('/api/open-data', {});
   else if (a === 'close') closeDrawer();
