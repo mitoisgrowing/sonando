@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sonando</title>
+<link rel="icon" href="/img/logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/base.css">
 <style>
   /* Portada: todo en una pantalla, tres tarjetas en el centro (1, 2, 3) */
@@ -91,7 +92,7 @@
 <script type="module">
 import { subscribe, esc, icon, avatar } from '/live.js';
 const $ = id => document.getElementById(id);
-$('logo').innerHTML = icon.rose;
+$('logo').innerHTML = '<img src="/img/logo.svg" alt="" style="display:block;width:1.15em;height:1.15em">';
 $('copyStage').onclick = async e => {
   e.preventDefault(); e.stopPropagation(); // no abrir la pantalla al copiar
   await navigator.clipboard.writeText(`${location.origin}/stage`);

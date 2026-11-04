@@ -112,7 +112,7 @@ const STEPS = [
       <p>${S.cloud?.status === 'ok' ? '<span class="okline">' + icon.check + 'Tablas listas: los puntos ya se guardan en Supabase</span>' : sb.test?.tables === false ? '<span class="err">Aún no encuentro las tablas: ¿has pulsado Run en el SQL Editor?</span>' : ''}</p>`}` },
   { t: 'Ritmo y extras', optional: true, done: () => !!S.settings?.onboarded, html: () => `
       <p><b>Activar ritmo</b> (en la columna de la cola): compartes tu pantalla con el audio del sistema y el fondo del directo late con el bombo y la caja.</p>
-      <p><b>Modo desarrollador</b> (arriba): manda mensajes y regalos de mentira para ensayar sin estar en directo.</p>
+      <p><b>Prueba</b> (arriba): manda mensajes y regalos de mentira para ensayar sin estar en directo. No se guarda nada y al volver a <b>Real</b> todo queda como estaba.</p>
       <p>En <b>Ajustes</b> puedes enseñar u ocultar el top 3, las notificaciones de donación y los puntos del chat.</p>` },
 ];
 

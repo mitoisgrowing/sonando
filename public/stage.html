@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sonando</title>
+<link rel="icon" href="/img/logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/base.css">
 <style>
   html, body { height: 100%; overflow: hidden; background: #000; }
@@ -231,9 +232,10 @@
   .toast .who { display: flex; align-items: baseline; gap: 22px; font-size: 40px; font-weight: 760; letter-spacing: -0.03em; line-height: 1.05; }
   .toast .amt { margin-left: auto; display: inline-flex; align-items: center; gap: 10px; font-size: 30px; font-weight: 650; color: rgb(255 255 255 / .75); letter-spacing: -0.01em; }
   .toast .amt img { width: 34px; height: 34px; align-self: center; }
+  .toast .who, .toast .gift { white-space: nowrap; }
   .toast .gift { font-size: 28px; font-weight: 500; color: rgb(255 255 255 / .7); margin-top: 8px; letter-spacing: -0.01em; }
   .toast .gift b { color: #fff; font-weight: 650; }
-  .toast .gimg { width: 36px; height: 36px; object-fit: contain; vertical-align: -9px; margin: 0 6px 0 4px; }
+  .toast .gimg { display: inline-block; width: 36px; height: 36px; object-fit: contain; vertical-align: -9px; margin: 0 8px; }
 
   .locked-badge { display: inline-flex; align-items: center; margin-left: 12px; padding: 6px 16px;
     border-radius: 99px; font-size: 22px; font-weight: 600; color: var(--ink); background: rgb(255 255 255 / .14); }
@@ -312,6 +314,7 @@
 
 <script type="module">
 import { subscribe, progressOf, fmt, esc, icon, avatar, flip } from '/live.js';
+import { initGames, renderGame } from '/juegos.js';
 
 const $ = id => document.getElementById(id);
 const stage = $('stage');
@@ -326,6 +329,7 @@ addEventListener('resize', fit); fit();
 let S = null, lyricsUri = null, queueSig = '', lastArt = null, active = -1, seenChat = new Set(), firstState = true;
 const LEAD = 250; // Spotify informa el progreso con algo de retraso
 
+initGames(stage);
 const sse = subscribe(s => { S = s; render(); });
 
 function setBackground(url) {
@@ -349,6 +353,7 @@ function render() {
   renderBadges();
   renderMeter();
   renderTop();
+  renderGame(S);
 
   // cola: la que ya está en camino (bloqueada) + las que quepan
   const items = [...(S.upNext ? [{ ...S.upNext, locked: true }] : []), ...S.queue];
@@ -758,11 +763,11 @@ async function nextAlert() {
   if (!m) { alerting = false; return; }
   alerting = true;
   // la foto se carga antes de abrir la isla (máx. 0,8 s), para que no aparezca de golpe
-  if (m.user.avatar) await Promise.race([preload(m.user.avatar), new Promise(r => setTimeout(r, 800))]);
+  await Promise.race([Promise.all([m.user.avatar && preload(m.user.avatar), m.image && preload(m.image)]), new Promise(r => setTimeout(r, 800))]);
   const what = !m.moved ? 'guarda el saldo para su canción' : m.to === 0 ? 'su canción es la siguiente' : `su canción sube al puesto ${m.to + 1}`;
   const t = $('toast');
   t.innerHTML = `<div class="in">${avatar(m.user, 86)}<div class="txt"><div class="who"><span>${esc(m.user.nick)}</span><span class="amt num"><img src="/img/moneda.png" alt="">${m.coins} ${m.coins === 1 ? 'moneda' : 'monedas'}</span></div>
-    <div class="gift">Ha donado ${m.image ? `<img class="gimg" src="${esc(m.image)}" alt="">` : ''}<b>${esc(m.text)}</b> · ${what}</div></div></div>`;
+    <div class="gift">Ha donado <b>${m.count || 1}${m.image ? `<img class="gimg" src="${esc(m.image)}" alt="">` : ' '}${esc(m.gift || m.text)}</b> · ${what}</div></div></div>`;
   const inner = t.firstChild;
   const w = Math.min(1100, inner.scrollWidth), h = 138;
   const SPRING = 'cubic-bezier(0.32, 1.25, 0.5, 1)', E = 'cubic-bezier(0.23, 1, 0.32, 1)';

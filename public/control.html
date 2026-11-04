@@ -4,10 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sonando · Control</title>
+<link rel="icon" href="/img/logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/base.css">
 <style>
   html, body { height: 100%; }
-  body { display: grid; grid-template-rows: auto 1fr; font-size: 14.5px; background: #0d0c0e; overflow: hidden; }
+  body { display: grid; grid-template-rows: auto auto 1fr; font-size: 14.5px; background: #0d0c0e; overflow: hidden; }
 
   button, input { font: inherit; color: inherit; }
   button { cursor: pointer; border: 0; background: none; }
@@ -36,6 +37,13 @@
   /* Barra superior */
   .top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 20px; padding: 14px 24px; border-bottom: 1px solid var(--line); }
   .brand { font-size: 18px; font-weight: 760; letter-spacing: -0.03em; display: flex; align-items: center; gap: 10px; }
+  /* izquierda: logo y a dónde ir · centro: conexiones · derecha: modo y ajustes */
+  .left { display: flex; align-items: center; gap: 18px; min-width: 0; }
+  .nav { display: flex; gap: 2px; }
+  .nav a { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 11px; border-radius: 10px; color: var(--ink-2); font-size: 13.5px; font-weight: 600;
+    text-decoration: none; white-space: nowrap; transition: background-color 150ms ease, color 150ms ease; }
+  .nav a svg { width: 17px; height: 17px; }
+  @media (hover: hover) { .nav a:hover { background: var(--fill); color: var(--ink); } }
   .pills { display: flex; gap: 6px; padding: 4px; border-radius: 99px; background: var(--fill); }
   .pill { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; border-radius: 99px; color: var(--ink-2); font-size: 13px; font-weight: 600;
     max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background-color 150ms ease, color 150ms ease; }
@@ -52,7 +60,16 @@
   .pop .row { display: flex; gap: 8px; }
   .acts { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
   .btn.ghost { background: none; color: var(--ink-2); text-decoration: none; }
-  #devBtn[aria-pressed="true"] { background: color-mix(in oklch, var(--warn) 22%, transparent); color: oklch(0.92 0.08 75); }
+  .mode { display: inline-flex; padding: 3px; border-radius: 99px; background: var(--fill); }
+  .mode button { height: 30px; padding: 0 14px; border: 0; border-radius: 99px; background: none; color: var(--ink-2); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer;
+    transition: background-color 160ms ease, color 160ms ease; }
+  .mode button[aria-pressed="true"] { background: var(--ink); color: #111; }
+  .mode button[data-mode="test"][aria-pressed="true"] { background: oklch(0.82 0.13 80); color: #1a1205; }
+  .mode button:disabled { opacity: .45; cursor: not-allowed; }
+  .testbar { display: none; align-items: center; justify-content: center; gap: 8px; height: 30px; font-size: 12.5px; font-weight: 650;
+    background: color-mix(in oklch, oklch(0.82 0.13 80) 20%, transparent); color: oklch(0.92 0.08 80); }
+  body.testing .testbar { display: flex; }
+  body > .cols { grid-row: 3; } /* la barra de prueba (fila 2) puede no estar */
   .brand svg { color: var(--rose); font-size: 20px; }
   .conn { display: flex; align-items: center; gap: 8px; }
   .conn input { width: 180px; }
@@ -88,17 +105,34 @@
   @media (hover: hover) { .msg:hover { background: var(--fill); } .msg:hover .copy { opacity: 1; } }
   .msg .copy:focus-visible { opacity: 1; }
   .empty { color: var(--ink-3); padding: 24px 8px; line-height: 1.5; }
-  .sim { border-top: 1px solid var(--line); padding: 14px 20px 16px; background: color-mix(in oklch, var(--warn) 6%, transparent); }
-  .sim h3 { font-size: 13px; font-weight: 700; display: flex; justify-content: space-between; }
-  .sim h3 span { color: var(--warn); font-weight: 600; }
-  .sim .row { display: grid; grid-template-columns: 120px 1fr; gap: 8px; margin-top: 10px; }
-  .sim .acts { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
-  .gifts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
-  .gifts .btn { height: auto; padding: 8px 6px; flex-direction: column; gap: 2px; font-size: 12.5px; }
-  .gifts .btn small { color: var(--ink-3); font-weight: 600; font-size: 11.5px; }
-  .cnt { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 13px; }
-  .cnt input { width: 76px; height: 34px; }
-  #devBtn[aria-pressed="true"] { background: color-mix(in oklch, var(--warn) 30%, transparent); color: oklch(0.92 0.08 75); }
+  /* simular (modo prueba): todo con min-width 0 y rejillas que se recolocan, para que no se rompa a ningún ancho */
+  .sim[hidden] { display: none; }
+  .sim { min-width: 0; border-top: 1px solid var(--line); padding: 14px 16px 16px; display: grid; gap: 10px; }
+  .sim h3 { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+  .sim h3::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: oklch(0.82 0.13 80); }
+  .sim h3 small { margin-left: auto; color: var(--ink-3); font-size: 12px; font-weight: 600; }
+  .who-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; height: 40px; padding: 0 4px 0 6px; border-radius: 12px; background: var(--fill); }
+  .who-row .av { width: 28px; height: 28px; font-size: 12px; }
+  .who-row input, .compose input { min-width: 0; width: 100%; height: 100%; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 13.5px; outline: none; }
+  .who-row input { font-weight: 650; }
+  .who-row .btn, .compose .btn { width: 32px; height: 32px; padding: 0; border-radius: 9px; }
+  .compose { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; height: 40px; padding: 0 4px 0 12px; border-radius: 12px; background: var(--fill); }
+  .who-row:focus-within, .compose:focus-within { box-shadow: inset 0 0 0 1.5px var(--ink-3); }
+  .compose .btn.primary svg { width: 16px; height: 16px; }
+  .gifts { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+  .gifts button { display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 8px; align-items: center; min-width: 0; padding: 7px 10px; border: 0; border-radius: 10px;
+    background: var(--fill); color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: background-color 140ms ease, transform 120ms ease; }
+  .gifts button:hover { background: var(--fill-2); }
+  .gifts button:active { transform: scale(.97); }
+  .gifts img { grid-row: span 2; width: 18px; height: 18px; }
+  .gifts b { font-size: 12.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gifts small { min-width: 0; font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gifts img { object-fit: contain; }
+  .sim-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .sim-foot .seg { display: inline-flex; padding: 3px; border-radius: 99px; background: var(--fill); }
+  .sim-foot .seg button { height: 26px; padding: 0 11px; border: 0; border-radius: 99px; background: none; color: var(--ink-2); font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; }
+  .sim-foot .seg button[aria-pressed="true"] { background: var(--ink); color: #111; }
+  .sim-foot .btn { margin-left: auto; height: 30px; padding: 0 10px; font-size: 12.5px; }
 
   /* Búsqueda */
   /* columna del medio: buscador fijo arriba y los resultados con su propio scroll */
@@ -150,14 +184,62 @@
   .scorebar input::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -6px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgb(0 0 0 / .5); }
   .scorebar input { -webkit-appearance: none; }
   .sblab { display: flex; justify-content: space-between; color: var(--ink-3); font-size: 11.5px; margin-top: 2px; }
-  .fxbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 20px 14px; }
+  /* misma rejilla para todo: 20 px de margen y botones del mismo ancho */
+  .fxbar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: center; padding: 0 20px 14px; }
+  .fxbar > .btn { justify-content: center; min-width: 0; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #queueWrap { padding: 0 20px 20px; }
+  #queueWrap .nowp { margin: 0 0 14px; }
   .fxbar #cine[aria-pressed="true"] { background: var(--ink); color: #111; }
+  /* juegos */
+  .fxbar #gRoul[aria-pressed="true"], .fxbar #gBat[aria-pressed="true"] { background: var(--ink); color: #111; }
+  .gcard { grid-column: 1 / -1; padding: 14px; border-radius: 16px; background: var(--fill); display: grid; gap: 12px; animation: gin 260ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+  @keyframes gin { from { opacity: 0; transform: translateY(-6px); } }
+  .gcard[hidden] { display: none; }
+  .gcard .gtop { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .gcard .gtop b { font-size: 15px; font-weight: 700; }
+  .gcard .gtop span { color: var(--ink-2); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gcard .gtop .num { margin-left: auto; font-size: 15px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; overflow: visible; }
+  .gcard .grow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .gcard .grow .btn { height: 34px; }
+  .gcard .seg { display: inline-flex; padding: 3px; border-radius: 99px; background: var(--fill-2); }
+  .gcard .seg button { height: 28px; padding: 0 12px; border: 0; border-radius: 99px; background: none; color: var(--ink-2); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .gcard .seg button[aria-pressed="true"] { background: var(--ink); color: #111; }
+  .gpick { display: grid; gap: 2px; max-height: 260px; overflow-y: auto; margin: 0 -6px; }
+  .gpick button { display: grid; grid-template-columns: 40px 1fr 28px; gap: 10px; align-items: center; padding: 5px 6px; border: 0; border-radius: 10px; background: none; color: var(--ink);
+    font: inherit; text-align: left; cursor: pointer; transition: background-color 140ms ease; }
+  .gpick button:hover { background: var(--fill-2); }
+  .gpick button[aria-pressed="true"] { background: var(--fill-2); }
+  .gpick img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; background: var(--fill-2); }
+  .gpick b { display: block; font-size: 13.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gpick small { display: block; font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gpick .slot { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12.5px; font-weight: 800; box-shadow: inset 0 0 0 1.5px var(--ink-3); color: transparent; }
+  .gpick [aria-pressed="true"] .slot { box-shadow: none; background: var(--ink); color: #111; }
+  .gcard .gmsg { color: var(--ink-2); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+  .gcard .gmsg b { color: var(--ink); }
+  .gcard .gwin { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; min-width: 0; }
+  .gcard .gwin p { font-size: 14px; overflow-wrap: anywhere; } .gcard .gwin small { color: var(--ink-2); font-size: 13px; }
+  .gcard .vbar { height: 8px; border-radius: 99px; overflow: hidden; background: oklch(0.62 0.13 250); }
+  .gcard .vbar i { display: block; height: 100%; background: var(--rose); transform-origin: left; transition: transform 400ms cubic-bezier(0.32, 0.72, 0, 1); }
+  .gcard .vote[aria-pressed="true"] { background: var(--ink); color: #111; }
+  .gcard .glist { display: grid; gap: 2px; max-height: 240px; overflow-y: auto; margin: 0 -6px; }
+  .gcard .gent { display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; align-items: center; padding: 4px 6px; border-radius: 10px; }
+  .gcard .gent:hover { background: var(--fill-2); }
+  .gcard .gent p { min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2); }
+  .gcard .gent p b { color: var(--ink); font-weight: 650; }
+  .gcard .gent .btn { width: 30px; height: 30px; padding: 0; }
+
   .beatdot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); transition: background-color 120ms ease, transform 120ms ease; }
   #beatBtn[aria-pressed="true"] .beatdot { background: var(--ok); }
   .beatdot.hit { transform: scale(1.8); background: #fff !important; transition-duration: 0ms; }
-  .sync { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--ink-2); font-size: 13px; }
+  .sync:empty { display: none; }
+  .fxnote { grid-column: 1 / -1; padding: 10px 12px; border-radius: 10px; background: color-mix(in oklch, oklch(0.82 0.13 80) 14%, transparent); color: var(--ink-2); font-size: 12.5px; line-height: 1.4; }
+  .fxnote[hidden] { display: none; }
+  .fxnote b { color: var(--ink); }
+  #beatTxt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .sync { grid-column: 1 / -1; display: flex; justify-content: flex-end; align-items: center; gap: 6px; color: var(--ink-2); font-size: 13px; }
   .sync .btn { height: 34px; padding: 0 10px; }
-  .judge { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; }
+  .judge { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .judge .btn { justify-content: center; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .btn.mehv { background: color-mix(in oklch, oklch(0.75 0.11 78) 24%, transparent); color: oklch(0.9 0.07 80); padding: 0 18px; }
   .judge .coins { justify-content: center; border-radius: 10px; }
   .btn.like { background: color-mix(in oklch, var(--ok) 22%, transparent); color: oklch(0.9 0.08 150); }
@@ -183,8 +265,10 @@
   .credits b { color: var(--ink); font-weight: 600; }
 
   @media (max-width: 1100px) {
-    body { overflow: auto; grid-template-rows: auto auto; }
-    .top { flex-wrap: wrap; gap: 12px 20px; }
+    body { overflow: auto; grid-template-rows: auto auto auto; }
+    .top { display: flex; flex-wrap: wrap; gap: 12px 20px; }
+    .top .acts { flex-wrap: wrap; margin-left: auto; }
+    .left { flex-wrap: wrap; }
     .cols { grid-template-columns: 1fr; min-height: auto; }
     .col { min-height: auto; }
     .col { border-right: 0; border-bottom: 1px solid var(--line); }
@@ -194,20 +278,21 @@
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="/" title="Volver al inicio" style="color:inherit;text-decoration:none"><span id="brandIcon"></span>Sonando</a>
+  <div class="left">
+    <a class="brand" href="/" title="Volver al inicio" style="color:inherit;text-decoration:none"><span id="brandIcon"></span>Sonando</a>
+    <nav class="nav" id="nav" aria-label="Páginas"></nav>
+  </div>
   <nav class="pills" aria-label="Conexiones">
     <button class="pill" data-pop="tt" aria-haspopup="dialog" title="TikTok"><span class="dot" id="ttDot"></span><span id="ttStatus">TikTok</span></button>
     <button class="pill" data-pop="sp" aria-haspopup="dialog" title="Spotify"><span class="dot" id="spDot"></span><span id="spStatus">Spotify</span></button>
     <button class="pill" data-pop="cloud" aria-haspopup="dialog" id="cloudBox" hidden title="Supabase"><span class="dot" id="cloudDot"></span><span id="cloudStatus">Supabase</span></button>
   </nav>
   <div class="acts">
-    <a class="btn ghost" href="/">Inicio</a>
-    <a class="btn ghost" href="/stage" target="_blank">Pantalla del directo</a>
-    <a class="btn ghost" href="/top" target="_blank">Top</a>
-    <button class="btn ghost" id="devBtn" aria-pressed="false">Desarrollador</button>
+    <span class="mode" role="group" aria-label="Modo"><button type="button" data-mode="real" aria-pressed="true">Real</button><button type="button" data-mode="test" aria-pressed="false" title="Ensaya con chat y regalos de mentira: no se guarda nada">Prueba</button></span>
     <button class="btn" id="setBtn">${icon.gear}Ajustes</button>
   </div>
 </header>
+<div class="testbar" role="status">Modo prueba · el chat y los regalos son de mentira y nada se guarda. Pulsa «Real» para volver a lo de antes.</div>
 
 <div class="pop" id="pop" role="dialog" hidden></div>
 
@@ -216,16 +301,14 @@
     <header><h2>Chat del directo</h2><span>Pulsa un mensaje para buscarlo</span></header>
     <div class="scroll" id="chat"></div>
     <section class="sim" id="dev" hidden>
-      <h3>Modo desarrollador <span>todo es de mentira</span></h3>
-      <div class="row">
-        <input id="simNick" value="maria_23" aria-label="Quién lo manda" spellcheck="false">
-        <input id="simText" value="ponme ojitos lindos de bad bunny" aria-label="Mensaje de chat falso">
-      </div>
-      <div class="acts"><button class="btn" data-sim="chat">Enviar mensaje</button>
-        <button class="btn" id="simRandom">Usuario al azar</button></div>
-      <div class="gifts" id="gifts"></div>
-      <div class="acts"><label class="cnt">Cantidad <input id="simCount" type="number" min="1" max="999" value="1"></label>
-        <button class="btn icon" id="simReset" title="Borrar saldo de regalos" aria-label="Borrar saldo de regalos"></button></div>
+      <h3>Simular <small>nada de esto se guarda</small></h3>
+      <label class="who-row"><span id="simAv"></span><input id="simNick" value="maria_23" aria-label="Quién lo manda" spellcheck="false" autocomplete="off">
+        <button type="button" class="btn icon" id="simRandom" title="Otra persona al azar" aria-label="Otra persona al azar"></button></label>
+      <form class="compose" id="simForm"><input id="simText" value="ponme ojitos lindos de bad bunny" aria-label="Mensaje de chat de prueba" autocomplete="off">
+        <button class="btn primary" aria-label="Enviar mensaje" title="Enviar (Intro)"></button></form>
+      <div class="gifts" id="gifts" role="group" aria-label="Mandar un regalo"></div>
+      <div class="sim-foot"><span class="seg" id="simCount" role="group" aria-label="Cuántos regalos"><button type="button" data-n="1" aria-pressed="true">×1</button><button type="button" data-n="5" aria-pressed="false">×5</button><button type="button" data-n="10" aria-pressed="false">×10</button></span>
+        <button type="button" class="btn ghost" id="simReset" title="Borra el saldo de monedas acumulado en la prueba">Borrar saldo</button></div>
     </section>
   </section>
 
@@ -239,9 +322,12 @@
     <header><h2>Cola</h2><span class="num" id="qCount"></span></header>
     <div class="fxbar" id="fx">
       <button class="btn" id="cine" aria-pressed="false">Modo cine</button>
-      <button class="btn rose" id="drop">¡Drop!</button>
       <button class="btn" id="beatBtn" aria-pressed="false"><span class="beatdot" id="beatDot"></span><span id="beatTxt">Activar ritmo</span></button>
+      <button class="btn" id="gRoul">Ruleta</button>
+      <button class="btn" id="gBat">Batalla</button>
+      <p class="fxnote" id="fxNote" hidden>Para el ritmo, en la ventana que sale marca <b>«Compartir audio del sistema»</b> y vuelve a pulsar «Activar ritmo».</p>
       <span class="sync" id="sync"></span>
+      <div class="gcard" id="gcard" hidden></div>
     </div>
     <div class="scorebar" id="scorebar" hidden>
       <div class="sbtop"><span>Medidor</span><b class="num" id="scoreVal">0 · Normal</b><button class="btn" id="scoreHide" type="button">Ocultar</button></div>
@@ -260,8 +346,9 @@ import { mountAjustes, updateAjustes } from '/ajustes.js';
 const $ = id => document.getElementById(id);
 const HOST_USER = { id: '__host', nick: 'Tú', avatar: '' };
 let S = null, requester = HOST_USER, picked = null, results = [], note = null, searching = false, midMode = '';
-$('brandIcon').innerHTML = icon.rose;
+$('brandIcon').innerHTML = '<img src="/img/logo.svg" alt="" width="24" height="24" style="display:block">';
 $('setBtn').innerHTML = `${icon.gear}Ajustes`;
+$('nav').innerHTML = `<a href="/">${icon.home}Inicio</a><a href="/stage" target="_blank">${icon.screen}Pantalla del directo</a><a href="/top" target="_blank">${icon.trophy}Top</a>`;
 
 const api = async (url, data) => {
   const r = await fetch(url, data === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
@@ -273,7 +360,7 @@ const api = async (url, data) => {
 const ajustes = mountAjustes(api);
 subscribe(s => {
   const first = !S; S = s;
-  renderTop(); renderChat(); renderMid(); renderQueue(); renderScore(); updateAjustes(s);
+  renderTop(); renderChat(); renderMid(); renderQueue(); renderScore(); renderGames(); renderMode(); updateAjustes(s);
 });
 
 // ---------- barra superior: estado corto; los detalles y los cambios, en Ajustes ----------
@@ -327,10 +414,10 @@ function renderChat() {
   box.innerHTML = S.chat.length ? S.chat.map(m => `
     <div class="msg ${m.kind} ${m.id === picked ? 'picked' : ''}" data-id="${m.id}" role="button" tabindex="0">
       ${avatar(m.user, 32)}
-      <span><b>${esc(m.user.nick)}${S.settings?.showPoints !== false && S.points?.pts?.[m.user.id] ? `<i class="pts num">${S.points.pts[m.user.id]} pts</i>` : ''}</b><p>${m.kind === 'gift' ? `${m.image ? `<img class="gimg" src="${esc(m.image)}" alt="">` : icon.rose}${esc(m.count > 1 ? m.text : `1 ${m.gift || m.text}`)}` : esc(m.text)}</p></span>
+      <span><b>${esc(m.user.nick)}${S.settings?.showPoints !== false && S.points?.pts?.[m.user.id] ? `<i class="pts num">${S.points.pts[m.user.id]} pts</i>` : ''}</b><p>${m.kind === 'gift' ? `<img class="gimg" src="${esc(m.image || '/img/moneda.png')}" alt="">${esc(m.count > 1 ? m.text : `1 ${m.gift || m.text}`)}` : esc(m.text)}</p></span>
       ${m.kind === 'chat' ? `<button class="btn icon copy" data-copy="${m.id}" aria-label="Copiar mensaje">${icon.copy}</button>` : '<span></span>'}
     </div>`).join('')
-    : '<p class="empty">Aquí aparecen los mensajes del directo en cuanto conectes TikTok.<br>Para probar sin directo, pulsa «Modo desarrollador» arriba.</p>';
+    : '<p class="empty">Aquí aparecen los mensajes del directo en cuanto conectes TikTok.<br>Para probar sin directo, pulsa «Prueba» arriba.</p>';
   if (atBottom) box.scrollTop = box.scrollHeight;
 }
 // buscar desde el chat: el mensaje entero (clic) o solo el trozo que selecciones (p. ej. el nombre de la canción)
@@ -360,24 +447,118 @@ $('chat').addEventListener('click', e => {
 $('chat').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('msg')) e.target.click(); });
 function flash(btn) { const old = btn.innerHTML; btn.innerHTML = icon.check; setTimeout(() => btn.innerHTML = old, 900); }
 
-// ---------- modo desarrollador: regalos y chat de mentira ----------
+// ---------- juegos: ruleta (todo lo que empiece por ! entra) y batalla (!1 / !2, tu voto vale la mitad) ----------
+let gSetup = null, gSig = '', gErr = '';
+const gTime = ms => { const x = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(x / 60)}:${String(x % 60).padStart(2, '0')}`; };
+const seg = (opts, cur) => `<span class="seg" role="group">${opts.map(([v, l]) => `<button type="button" data-secs="${v}" aria-pressed="${v === cur}">${l}</button>`).join('')}</span>`;
+// tocas dos canciones: la primera es la 1 y la segunda la 2; tocar una marcada la quita
+const songPick = (e, slot) => `<button type="button" data-pick-song="${esc(e.id)}" aria-pressed="${!!slot}"><img src="${esc(e.art)}" alt=""><span><b>${esc(e.name)}</b><small>${esc(e.artists)}</small></span><span class="slot">${slot || ''}</span></button>`;
+function renderGames() {
+  const g = S.game, busy = g && (g.phase === 'open' || g.phase === 'spinning');
+  if (g) gSetup = null;
+  $('gRoul').disabled = $('gBat').disabled = !!busy;
+  $('gRoul').setAttribute('aria-pressed', String(gSetup?.type === 'roulette' || g?.type === 'roulette'));
+  $('gBat').setAttribute('aria-pressed', String(gSetup?.type === 'battle' || g?.type === 'battle'));
+  const q = S.queue || [];
+  if (gSetup?.type === 'battle') { // la cola cambia: que las elegidas sigan existiendo
+    if (gSetup.a && !q.some(e => e.id === gSetup.a)) gSetup.a = null;
+    if (gSetup.b && !q.some(e => e.id === gSetup.b)) gSetup.b = null;
+  }
+  const sig = JSON.stringify([g && [g.id, g.phase, g.entries?.map(e => e.user.id + e.text).join('|'), g.tally, g.host, g.result], gSetup, gErr, gSetup?.type === 'battle' && q.map(e => e.id)]);
+  if (sig === gSig) return; gSig = sig;
+  const c = $('gcard'); c.hidden = !g && !gSetup;
+  const err = gErr ? `<p class="gmsg" style="color:oklch(0.8 0.12 25)">${esc(gErr)}</p>` : '';
+  if (gSetup?.type === 'roulette') {
+    c.innerHTML = `<div class="gtop"><b>Ruleta</b><span>entra todo lo que escriban empezando por !</span></div>
+      <div class="grow">${seg([[30, '30 s'], [60, '1 min'], [120, '2 min']], gSetup.secs)}
+        <button class="btn primary" data-g="start">Empezar ruleta</button><button class="btn" data-g="cancelSetup">Cancelar</button></div>${err}`;
+  } else if (gSetup?.type === 'battle') {
+    c.innerHTML = q.length < 2 ? `<div class="gtop"><b>Batalla</b></div><p class="gmsg">Hacen falta al menos <b>2 canciones en la cola</b>.</p>
+        <div class="grow"><button class="btn" data-g="cancelSetup">Cerrar</button></div>`
+      : `<div class="gtop"><b>Batalla</b><span>el chat vota !1 o !2 · tu voto cuenta la mitad</span></div>
+      <p class="gmsg">Toca dos canciones de la cola.</p>
+      <div class="gpick" role="group" aria-label="Canciones de la batalla">${q.map(e => songPick(e, e.id === gSetup.a ? 1 : e.id === gSetup.b ? 2 : 0)).join('')}</div>
+      <div class="grow">${seg([[30, '30 s'], [45, '45 s'], [60, '1 min']], gSetup.secs)}
+        <button class="btn primary" data-g="start" ${gSetup.a && gSetup.b ? '' : 'disabled'}>Empezar batalla</button><button class="btn" data-g="cancelSetup">Cancelar</button></div>${err}`;
+  } else if (g?.type === 'roulette') {
+    const w = g.entries[g.winner];
+    c.innerHTML = `<div class="gtop"><b>Ruleta</b><span>${g.entries.length} ${g.entries.length === 1 ? 'entrada' : 'entradas'}</span>${g.phase === 'open' ? `<span class="num" data-ends="${g.endsAt}">${gTime(g.endsAt - Date.now())}</span>` : ''}</div>
+      ${g.phase === 'open' ? `${g.entries.length ? `<div class="glist">${g.entries.slice().reverse().map(e => `<div class="gent">${avatar(e.user, 24)}<p><b>${esc(e.user.nick)}</b> ${esc(e.text)}</p><button class="btn icon" data-kick="${esc(e.user.id)}" aria-label="Quitar a ${esc(e.user.nick)} de la ruleta" title="Quitar de la ruleta">${icon.x}</button></div>`).join('')}</div>` : '<p class="gmsg">Aún no ha entrado nadie. Entra todo lo que escriban empezando por <b>!</b></p>'}
+        <div class="grow"><button class="btn primary" data-g="spin" ${g.entries.length ? '' : 'disabled'}>Girar ya</button><button class="btn" data-g="close">Cancelar</button></div>`
+      : g.phase === 'spinning' ? '<p class="gmsg">Girando…</p>'
+      : g.phase === 'empty' ? '<p class="gmsg">Nadie escribió con ! esta vez.</p><div class="grow"><button class="btn" data-g="close">Cerrar</button></div>'
+      : `<div class="gwin">${avatar(w.user, 36)}<p><b>${esc(w.user.nick)}</b><br><small>«${esc(w.text)}»</small></p></div>
+        <div class="grow"><button class="btn primary" data-g="find">Buscar su canción</button><button class="btn" data-g="close">Cerrar</button></div>`}${err}`;
+  } else if (g?.type === 'battle') {
+    const done = g.phase === 'done', p = Math.round((done ? g.result : g.tally).final1 * 100);
+    c.innerHTML = `<div class="gtop"><b>Batalla</b><span>${g.tally.total} ${g.tally.total === 1 ? 'voto' : 'votos'} del chat</span>${done ? '' : `<span class="num" data-ends="${g.endsAt}">${gTime(g.endsAt - Date.now())}</span>`}</div>
+      <div class="vbar"><i style="transform:scaleX(${p / 100})"></i></div>
+      <p class="gmsg"><b>1 · ${p}%</b> ${esc(g.a.name)}<br><b>2 · ${100 - p}%</b> ${esc(g.b.name)}</p>
+      ${done ? `<p class="gmsg"><b>${g.result.winner ? `Gana la ${g.result.winner}` : 'Empate'}</b>${g.result.winner ? ' · suena la siguiente' : ''}</p><div class="grow"><button class="btn" data-g="close">Cerrar</button></div>`
+      : `<div class="grow"><button class="btn vote" data-g="vote" data-pick="1" aria-pressed="${g.host === 1}">Voto la 1</button><button class="btn vote" data-g="vote" data-pick="2" aria-pressed="${g.host === 2}">Voto la 2</button></div>
+        <div class="grow"><button class="btn primary" data-g="end">Terminar ya</button><button class="btn" data-g="close">Cancelar</button></div>`}${err}`;
+  } else c.innerHTML = '';
+}
+setInterval(() => { const n = $('gcard').querySelector('[data-ends]'); if (n) n.textContent = gTime(+n.dataset.ends - Date.now()); }, 250);
+const gAct = async data => { gErr = ''; try { await api('/api/game', data); } catch (e) { gErr = e.message; } gSig = ''; renderGames(); };
+$('gRoul').onclick = () => { gErr = ''; gSetup = gSetup?.type === 'roulette' ? null : { type: 'roulette', secs: 60 }; renderGames(); };
+$('gBat').onclick = () => { gErr = ''; gSetup = gSetup?.type === 'battle' ? null : { type: 'battle', secs: 45, a: S.queue?.[0]?.id, b: S.queue?.[1]?.id }; renderGames(); };
+$('gcard').addEventListener('click', e => {
+  const ps = e.target.closest('[data-pick-song]');
+  if (ps) {
+    const id = ps.dataset.pickSong;
+    if (gSetup.a === id) gSetup.a = null; else if (gSetup.b === id) gSetup.b = null;
+    else if (!gSetup.a) gSetup.a = id; else if (!gSetup.b) gSetup.b = id; else gSetup.b = id; // ya hay dos: cambia la 2
+    return renderGames();
+  }
+  const sb = e.target.closest('[data-secs]'); if (sb) { gSetup.secs = +sb.dataset.secs; return renderGames(); }
+  const k = e.target.closest('[data-kick]'); if (k) return gAct({ action: 'kick', user: k.dataset.kick });
+  const b = e.target.closest('[data-g]'); if (!b) return;
+  const a = b.dataset.g, g = S.game;
+  if (a === 'cancelSetup') { gSetup = null; gErr = ''; return renderGames(); }
+  if (a === 'start') return gAct(gSetup.type === 'roulette' ? { action: 'roulette', secs: gSetup.secs } : { action: 'battle', a: gSetup.a, b: gSetup.b, secs: gSetup.secs });
+  if (a === 'vote') return gAct({ action: 'vote', pick: g.host === +b.dataset.pick ? 0 : +b.dataset.pick }); // pulsar otra vez lo quita
+  if (a === 'find') { const w = g.entries[g.winner]; pickFromChat({ id: null, user: w.user }, w.text); return; }
+  gAct({ action: a });
+});
+
+// ---------- modo prueba: regalos y chat de mentira ----------
 // precios en monedas de los regalos más típicos de TikTok
 const GIFTS = [['Rosa', 1], ['GG', 1], ['Corazón con dedos', 5], ['Rosquilla', 30], ['Perfume', 20], ['Gorra', 99], ['Galaxia', 1000], ['León', 29999]];
-$('gifts').innerHTML = GIFTS.map(([n, c], i) => `<button class="btn rose" data-gift="${i}">${n}<small>${c} ${c === 1 ? 'moneda' : 'monedas'}</small></button>`).join('');
-$('simReset').innerHTML = icon.x;
+// los regalos que ya te han llegado de verdad (con su foto y precio) y, si aún no hay, unos típicos
+let giftList = GIFTS, giftSig = '';
+function renderGifts() {
+  const real = Object.entries(S.giftImgs || {}).map(([n, g]) => [n, g.coins, g.img]);
+  giftList = real.length ? real.sort((a, b) => a[1] - b[1]).slice(0, 12) : GIFTS.map(([n, c]) => [n, c, n === 'Rosa' ? '/img/rosa.png' : '/img/moneda.png']);
+  const sig = JSON.stringify(giftList); if (sig === giftSig) return; giftSig = sig;
+  $('gifts').innerHTML = giftList.map(([n, c, img], i) => `<button type="button" data-gift="${i}" title="${esc(n)} · ${c.toLocaleString('es')} ${c === 1 ? 'moneda' : 'monedas'}"><img src="${esc(img)}" alt=""><b>${esc(n)}</b><small>${c.toLocaleString('es')} ${c === 1 ? 'moneda' : 'monedas'}</small></button>`).join('');
+}
+$('simRandom').innerHTML = icon.shuffle || '↻';
+$('simForm').querySelector('button').innerHTML = icon.send || '➜';
+let simN = 1;
+$('simCount').onclick = e => { const b = e.target.closest('[data-n]'); if (!b) return; simN = +b.dataset.n; for (const x of $('simCount').children) x.setAttribute('aria-pressed', String(x === b)); };
 const nick = () => $('simNick').value.trim() || 'invitado';
-document.querySelector('[data-sim="chat"]').onclick = () => api('/api/sim', { kind: 'chat', nick: nick(), text: $('simText').value });
+const simAv = () => { $('simAv').innerHTML = avatar({ id: 'sim:' + nick(), nick: nick() }, 28); };
+$('simNick').oninput = simAv; simAv();
+$('simForm').onsubmit = e => { e.preventDefault(); if ($('simText').value.trim()) api('/api/sim', { kind: 'chat', nick: nick(), text: $('simText').value }); };
 $('gifts').onclick = e => {
   const b = e.target.closest('[data-gift]'); if (!b) return;
-  const [name, coins] = GIFTS[+b.dataset.gift];
-  api('/api/sim', { kind: 'gift', nick: nick(), gift: name, coins, count: Math.max(1, Math.min(999, +$('simCount').value || 1)) });
+  const [name, coins] = giftList[+b.dataset.gift];
+  api('/api/sim', { kind: 'gift', nick: nick(), gift: name, coins, count: simN });
 };
-$('simRandom').onclick = () => { $('simNick').value = ['luna.mp3', 'davidd', 'sofi_rk', 'xavi99', 'ana.beats', 'shiroo', 'pablo_rk', 'mery'][Math.floor(Math.random() * 8)] + Math.floor(Math.random() * 90 + 10); };
+$('simRandom').onclick = () => { setTimeout(simAv); $('simNick').value = ['luna.mp3', 'davidd', 'sofi_rk', 'xavi99', 'ana.beats', 'shiroo', 'pablo_rk', 'mery'][Math.floor(Math.random() * 8)] + Math.floor(Math.random() * 90 + 10); };
 $('simReset').onclick = () => api('/api/sim', { kind: 'reset' });
-let dev = false;
-try { dev = localStorage.getItem('sonando-dev') === '1'; } catch {}
-const setDev = on => { dev = on; $('dev').hidden = !on; $('devBtn').setAttribute('aria-pressed', String(on)); try { localStorage.setItem('sonando-dev', on ? '1' : '0'); } catch {} };
-$('devBtn').onclick = () => setDev(!dev); setDev(dev);
+// Real / Prueba: lo decide el servidor (la prueba es una caja aparte que se tira al volver)
+function renderMode() {
+  renderGifts();
+  const live = S.tiktok.status === 'on';
+  document.body.classList.toggle('testing', !!S.test);
+  $('dev').hidden = !S.test;
+  for (const b of document.querySelectorAll('[data-mode]')) b.setAttribute('aria-pressed', String((b.dataset.mode === 'test') === !!S.test));
+  const tb = document.querySelector('[data-mode="test"]');
+  tb.disabled = live && !S.test; tb.title = tb.disabled ? 'Estás en directo: la prueba solo se puede usar sin directo' : 'Ensaya con chat y regalos de mentira: no se guarda nada';
+}
+document.querySelector('.mode').onclick = e => { const b = e.target.closest('[data-mode]'); if (b && !b.disabled) api('/api/test', { on: b.dataset.mode === 'test' }).catch(err => alert(err.message)); };
 
 // ---------- búsqueda / configuración ----------
 function renderMid(force) {
@@ -503,7 +684,7 @@ let qSig = '';
 function renderQueue() {
   const items = [...(S.upNext ? [{ ...S.upNext, locked: true }] : []), ...S.queue];
   $('qCount').textContent = `${S.queue.length} / ${S.rules.max}`;
-  const J = S.judge?.uri === S.now?.uri ? S.judge : {};
+  const J = S.judge && S.judge.uri === S.now?.uri ? S.judge : {}; // sin nada sonando ambos son undefined
   const sig = JSON.stringify([S.now?.uri, S.now?.isPlaying, items.map(e => [e.id, e.coins]), J.kind, J.loved, S.canLove, S.manual]);
   if (sig !== qSig) {
     qSig = sig;
@@ -575,7 +756,6 @@ function renderScore() {
   $('scoreHide').hidden = !sc.set;
 }
 $('cine').onclick = () => api('/api/fx', { cinema: !S.fx?.cinema });
-$('drop').onclick = () => api('/api/fx', { drop: true });
 
 // ---------- ritmo: escucha el audio del PC desde aquí (no en la pantalla del directo) ----------
 // El detector corre en el hilo de audio (beat-worklet.js): sigue aunque esta pestaña quede en segundo plano.
@@ -603,8 +783,8 @@ $('beatBtn').onclick = async () => {
     };
     stream.getAudioTracks()[0].addEventListener('ended', () => { if (beatCtx === ctx) $('beatBtn').click(); });
     beatCtx = ctx;
-    $('beatBtn').setAttribute('aria-pressed', 'true'); $('beatTxt').textContent = 'Ritmo activo';
-  } catch (err) { $('beatTxt').textContent = 'Marca «Compartir audio del sistema»'; console.warn(err); }
+    $('beatBtn').setAttribute('aria-pressed', 'true'); $('beatTxt').textContent = 'Ritmo activo'; $('fxNote').hidden = true;
+  } catch (err) { $('beatTxt').textContent = 'Activar ritmo'; $('fxNote').hidden = false; console.warn(err); }
 };
 $('sync').addEventListener('click', e => {
   const b = e.target.closest('button');

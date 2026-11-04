@@ -39,6 +39,21 @@ export function demoState() {
     tiktok: { status: 'on', user: 'tu_canal', error: '' }, spotify: { status: 'ok', error: '' }, manual: false,
     rules: { max: 10, nextAt: 5, step: 2 }, hasClientId: true, settings: { showTop: true, showAlerts: true, showPoints: true, liveDone: true, onboarded: true },
     supabaseUrl: '', redirect: 'http://127.0.0.1:5190/callback', verdict: null, judge: { uri: now.uri, kind: 'liked', loved: true },
-    score: { uri: now.uri, value: 32, set: true }, points, cloud: { status: 'off' }, offset: 0, scroll: 0, alerts: [], stats: {}, fx: { cinema: false, drop: 0 }, canLove: true,
+    game: demoGame(now), score: { uri: now.uri, value: 32, set: true }, points, cloud: { status: 'off' }, offset: 0, scroll: 0, alerts: [], stats: {}, fx: { cinema: false, drop: 0 }, canLove: true,
   };
+}
+
+// ?demo&game=ruleta | batalla: un juego en marcha para las capturas
+function demoGame() {
+  const kind = new URLSearchParams(location.search).get('game');
+  const t = Date.now();
+  if (kind === 'ruleta') {
+    const asks = ['madrugada de kai soler', 'satélite de nube cero', 'papel mojado', 'cristal de vela roja', 'eco de duna', 'domingo de alba rey', 'kilómetro cero', 'dembow del sur'];
+    return { type: 'roulette', id: 'demo-r', phase: 'done', startedAt: t - 70000, endsAt: t - 10000, winner: 3, banned: [], entries: USERS.map((user, i) => ({ user, text: asks[i] })) };
+  }
+  if (kind === 'batalla') {
+    return { type: 'battle', id: 'demo-b', phase: 'open', startedAt: t - 15000, endsAt: t + 30000, a: track(1, { user: USERS[1] }), b: track(2, { user: USERS[2] }), host: 1, result: null,
+      tally: { v1: 14, v2: 19, total: 33, chat1: 14 / 33, final1: 0.5 * 14 / 33 + 0.5 } };
+  }
+  return null;
 }

@@ -1,4 +1,6 @@
-# Sonando
+<p align="center"><img src="public/img/logo.svg" width="112" alt="Logo de Sonando"></p>
+
+<h1 align="center">Sonando</h1>
 
 **La cola de canciones para tus directos de TikTok.** Tu público pide canciones en el chat, tú eliges la versión buena en Spotify, y la pantalla del directo enseña la letra sincronizada, la cola, las donaciones, tu veredicto y un medidor de cuánto te está gustando.
 
@@ -14,13 +16,17 @@
 - **Veredictos con animación:** Aprobada, Meh, Saltada (con cuenta atrás de 15 s para salvarla), Salvada y Guardada en tu lista.
 - **Medidor de −50 a +50** (Basura · Flojo · Normal · Buena · Temazo) que mueves en directo. En +50 la pantalla se tiñe del color de la portada.
 - **Puntos para tu público** por escribir, pedir canciones, tus veredictos y los regalos, con top del directo y top de siempre. Cada persona se reconoce por su ID de TikTok, aunque se cambie el nombre.
-- **El fondo late con la música** (bombo y caja) y tiene modo cine y botón de drop.
+- **El fondo late con la música** (bombo y caja) y tiene modo cine.
+- **Juegos en directo:** la **ruleta** (durante el tiempo que elijas, todo lo que escriban empezando por `!` entra en la rueda, y puedes quitar pedidos) y la **batalla de canciones** (el chat vota `!1` o `!2` y tu voto cuenta la mitad; la ganadora suena la siguiente).
+- **Modo Prueba:** ensaya con chat y regalos de mentira sin tocar nada real. Al volver a Real, todo queda como estaba.
 - **Alertas de donación** con la foto de quien regala y la del regalo.
 - **Búsqueda de canciones, álbumes y EPs**, con «Añadir todas».
 
 | Inicio | Panel de control |
 | --- | --- |
 | ![Inicio](release/screenshots/inicio.png) | ![Panel de control](release/screenshots/panel.png) |
+| **Ruleta** | **Batalla de canciones** |
+| ![Ruleta](release/screenshots/ruleta.png) | ![Batalla](release/screenshots/batalla.png) |
 | **Tutorial de primera vez** | **Top de espectadores** |
 | ![Tutorial](release/screenshots/tutorial.png) | ![Top](release/screenshots/top.png) |
 

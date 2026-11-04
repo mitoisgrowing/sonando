@@ -6,6 +6,7 @@ import { exec } from 'node:child_process';
 import sea from 'node:sea';
 import { TikTokLiveConnection, WebcastEvent, ControlEvent } from 'tiktok-live-connector';
 import * as Q from './queue.js';
+import * as G from './games.js';
 
 const PORT = +process.env.SONANDO_PORT || 5190; // otro puerto solo para pruebas (Spotify espera 5190)
 const HOST = '127.0.0.1'; // solo este PC: el panel no tiene contraseña
@@ -43,6 +44,7 @@ loadAlerts(); fs.watch(ALERTS, () => { loadAlerts(); broadcast(); });
 
 state.stats = { songs: 0, coins: 0, liked: 0, meh: 0, skipped: 0 };
 state.fx = { cinema: false, drop: 0 };
+state.game = null; // ruleta o batalla en curso
 state.score = { uri: null, value: 0, set: false }; // medidor de -50 a +50 de la canción que suena // efectos que lanzas desde el panel
 
 // ---------- difusión a las pantallas (SSE) ----------
@@ -51,8 +53,8 @@ const BUILD = Date.now().toString(36); // cambia en cada arranque: las pantallas
 function snapshot() {
   return {
     now: state.now, upNext: state.upNext, queue: queue.list, credits: queue.credits,
-    chat: state.chat, lyrics: state.lyrics, verdict: state.verdict, judge: state.judge, score: state.score, points: pointsView(), cloud: state.cloud, canLove: /user-library-modify/.test(config.tokens?.scope || ''), offset: state.offset || 0, scroll: state.scroll || 0, alerts,
-    stats: state.stats, fx: state.fx, tiktok: state.tiktok, spotify: state.spotify,
+    chat: state.chat, lyrics: state.lyrics, verdict: state.verdict, judge: state.judge, score: state.score, game: gameView(), points: pointsView(), cloud: state.cloud, canLove: /user-library-modify/.test(config.tokens?.scope || ''), offset: state.offset || 0, scroll: state.scroll || 0, alerts,
+    stats: state.stats, test: !!state.test, giftImgs, fx: state.fx, tiktok: state.tiktok, spotify: state.spotify,
     build: BUILD, rules: { max: Q.MAX, nextAt: Q.NEXT_AT, step: Q.STEP }, hasClientId: !!config.clientId, settings: config.settings, dataDir: DATA, supabaseUrl: config.supabase?.url || '', redirect: REDIRECT, manual: state.spotify.premium === false,
   };
 }
@@ -60,7 +62,7 @@ function broadcast() {
   const msg = `data: ${JSON.stringify(snapshot())}\n\n`;
   for (const res of clients) res.write(msg);
 }
-const saveQueue = () => save('queue.json', { ...queue, upNext: state.upNext || null });
+const saveQueue = () => { if (!state.test) save('queue.json', { ...queue, upNext: state.upNext || null }); }; // en modo prueba no se guarda nada
 const persist = () => { saveQueue(); broadcast(); };
 
 function pushChat(item) {
@@ -256,7 +258,7 @@ setInterval(() => { if (pointsDirty) { save('points.json', points); pointsDirty 
 const lastChatPts = new Map(), simNames = {}, avatarCache = new Map();
 function award(user, pts) {
   if (!user?.id || !pts || user.id === Q.HOST || user.id === 'anon') return;
-  if (user.id.startsWith('sim:')) { session[user.id] = (session[user.id] || 0) + pts; (simNames[user.id] = user.nick); return; } // modo desarrollador: solo cuenta en este directo
+  if (state.test || user.id.startsWith('sim:')) { session[user.id] = (session[user.id] || 0) + pts; (simNames[user.id] = user.nick); return; } // modo desarrollador: solo cuenta en este directo
   if (user.handle && user.handle !== user.id && points[user.handle]) { // puntos de antes, guardados por @usuario
     const old = points[user.handle]; delete points[user.handle];
     points[user.id] = { ...old, ...points[user.id], total: (points[user.id]?.total || 0) + old.total };
@@ -312,8 +314,64 @@ function pointsView() {
     .map(([id, pts]) => ({ id, pts, total: points[id]?.total || pts, nick: points[id]?.nick || simNames[id] || id, avatar: points[id]?.avatar || '' }));
   const ids = new Set([...state.chat.map(m => m.user.id), ...queue.list.map(e => e.user.id), state.now?.user?.id, state.upNext?.user?.id, ...Object.keys(queue.credits)]);
   const pts = {}; for (const id of ids) if (points[id]) pts[id] = points[id].total;
-  const names = {}; for (const id of Object.keys(queue.credits)) names[id] = points[id]?.nick || id;
+  const names = {}; for (const id of Object.keys(queue.credits)) names[id] = points[id]?.nick || simNames[id] || id.replace(/^sim:/, "");
   return { top, pts, names };
+}
+
+// ---------- modo prueba ----------
+// Una caja aparte: empieza con una copia de tu cola y un chat vacío; regalos, chat y puntos de prueba
+// no se guardan. Al volver a Real se tira todo y vuelve lo de antes tal cual.
+let real = null;
+function setTest(on) {
+  if (on === !!state.test) return;
+  if (on) {
+    real = { list: queue.list, credits: queue.credits, chat: state.chat, session: { ...session }, stats: state.stats };
+    queue.list = structuredClone(queue.list); queue.credits = {}; state.chat = []; state.stats = { ...state.stats };
+    state.test = true;
+  } else {
+    state.test = false;
+    queue.list = real.list; queue.credits = real.credits; state.chat = real.chat; state.stats = real.stats;
+    for (const k of Object.keys(session)) delete session[k]; Object.assign(session, real.session);
+    real = null;
+  }
+  clearTimeout(gameTimer); state.game = null; voters.clear();
+  persist();
+}
+
+// ---------- juegos: ruleta y batalla ----------
+let gameTimer = null;
+const voters = new Map(); // quién votó en la batalla, para darle puntos si acierta
+function gameChat(user, text) {
+  if (!G.onChat(state.game, user, text)) return false;
+  if (state.game.type === 'battle') voters.set(user.id, user);
+  return true;
+}
+// lo que ven las pantallas: sin el mapa de votos por persona, solo los totales
+function gameView() {
+  const g = state.game; if (!g) return null;
+  if (g.type === 'roulette') return { ...g, entries: g.entries.map(e => ({ user: e.user, text: e.text })) };
+  const { votes, ...rest } = g;
+  return { ...rest, tally: G.tally(g) };
+}
+function clearGameLater(id, ms) { setTimeout(() => { if (state.game?.id === id) { state.game = null; broadcast(); } }, ms); }
+function closeRoulette() {
+  clearTimeout(gameTimer);
+  const g = state.game; if (g?.type !== 'roulette' || g.phase !== 'open') return;
+  G.spin(g); broadcast();
+  if (g.phase === 'spinning') setTimeout(() => { if (state.game?.id === g.id) { g.phase = 'done'; broadcast(); clearGameLater(g.id, 45000); } }, 7000); // lo que tarda la rueda
+  else clearGameLater(g.id, 6000);
+}
+function finishBattle() {
+  clearTimeout(gameTimer);
+  const g = state.game; if (g?.type !== 'battle' || g.phase !== 'open') return;
+  G.endBattle(g);
+  const win = g.result.winner === 1 ? g.a : g.result.winner === 2 ? g.b : null;
+  if (win) {
+    if (queue.list.some(e => e.id === win.id)) Q.toFront(queue, win.id); // la ganadora suena la siguiente
+    for (const [id, user] of voters) if (g.votes[id] === g.result.winner) award(user, 3);
+    persist();
+  }
+  voters.clear(); broadcast(); clearGameLater(g.id, 20000);
 }
 
 // ---------- TikTok ----------
@@ -340,7 +398,11 @@ const userOf = u => {
   return { id, handle, nick: /[\p{L}\p{N}]/u.test(nick) ? nick : handle || id, avatar: avatarOf(u) };
 };
 
+// fotos de los regalos de verdad, por nombre: así los regalos de prueba salen con su imagen real
+const giftImgs = load('regalos.json', {});
 function onGift(user, coins, giftName, count, image = '') {
+  const unit = Math.round(coins / count);
+  if (!state.test && /^https?:/.test(image) && (giftImgs[giftName]?.img !== image || giftImgs[giftName]?.coins !== unit)) { giftImgs[giftName] = { img: image, coins: unit }; save('regalos.json', giftImgs); }
   const r = Q.gift(queue, user, coins);
   award(user, coins * PTS.coin);
   state.stats.coins += coins;
@@ -355,13 +417,16 @@ async function connectTikTok(name) {
   const c = new TikTokLiveConnection(config.tiktokUser, { processInitialData: false });
   let chatDebug = 0;
   c.on(WebcastEvent.CHAT, d => {
+    if (state.test) setTest(false);
     const text = d.comment ?? d.content ?? d.common?.describe ?? '';
     if (!text && chatDebug++ < 3) console.log('chat sin texto, campos:', JSON.stringify(d, (k, v) => typeof v === 'string' && v.length > 80 ? v.slice(0, 80) : v).slice(0, 1500));
     const user = userOf(d.user);
     if (text && Date.now() - (lastChatPts.get(user.id) || 0) > 30000) { lastChatPts.set(user.id, Date.now()); award(user, PTS.chat); }
+    gameChat(user, text);
     pushChat({ kind: 'chat', user, text });
   });
   c.on(WebcastEvent.GIFT, d => {
+    if (state.test) setTest(false);
     if (d.giftDetails?.giftType === 1 && !d.repeatEnd) return; // racha en curso: se cuenta al cerrarse
     const count = d.repeatCount || 1;
     const g = d.giftDetails;
@@ -561,6 +626,27 @@ const routes = {
     if (config.supabase) { await cloudPull(); Object.keys(points).forEach(id => dirtyIds.add(id)); await cloudPush(); } else state.cloud = { status: 'off', error: '' };
     broadcast(); send(res, 200, state.cloud);
   },
+  // juegos: { action: 'roulette' | 'spin' | 'battle' | 'vote' | 'end' | 'close', secs, a, b, pick }
+  'POST /api/game': async (req, res) => {
+    const b = await body(req);
+    const busy = state.game && (state.game.phase === 'open' || state.game.phase === 'spinning');
+    const secs = Math.max(10, Math.min(300, Math.round(+b.secs || 60)));
+    if (b.action === 'roulette') {
+      if (busy) return send(res, 409, { error: 'Ya hay un juego en marcha' });
+      state.game = G.startRoulette(secs); gameTimer = setTimeout(closeRoulette, secs * 1000);
+    } else if (b.action === 'spin') closeRoulette();
+    else if (b.action === 'kick') G.kick(state.game, String(b.user || ''));
+    else if (b.action === 'battle') {
+      if (busy) return send(res, 409, { error: 'Ya hay un juego en marcha' });
+      const A = queue.list.find(e => e.id === b.a), B = queue.list.find(e => e.id === b.b);
+      if (!A || !B || A === B) return send(res, 400, { error: 'Elige dos canciones distintas de la cola' });
+      voters.clear(); state.game = G.startBattle(A, B, secs); gameTimer = setTimeout(finishBattle, secs * 1000);
+    } else if (b.action === 'vote') { if (state.game?.type === 'battle' && state.game.phase === 'open') state.game.host = [0, 1, 2].includes(+b.pick) ? +b.pick : 0; }
+    else if (b.action === 'end') { if (state.game?.type === 'battle') finishBattle(); else closeRoulette(); }
+    else if (b.action === 'close') { clearTimeout(gameTimer); state.game = null; voters.clear(); }
+    else return send(res, 400, { error: 'Acción desconocida' });
+    broadcast(); send(res, 200, { ok: true });
+  },
   'POST /api/beat': async (req, res) => {
     const b = await body(req);
     if (['kick', 'snare', 'drop'].includes(b.k)) {
@@ -589,14 +675,20 @@ const routes = {
   },
   'POST /api/tiktok': async (req, res) => { connectTikTok(String((await body(req)).username || '')); send(res, 200, { ok: true }); },
   // simulador para ensayar sin estar en directo
+  'POST /api/test': async (req, res) => {
+    const on = !!(await body(req)).on;
+    if (on && state.tiktok.status === 'on') return send(res, 409, { error: 'Estás en directo: el modo prueba solo se puede usar sin directo' });
+    setTest(on); send(res, 200, { test: state.test });
+  },
   'POST /api/sim': async (req, res) => {
     const b = await body(req);
+    if (!state.test) return send(res, 409, { error: 'Activa el modo prueba para simular' });
     const nick = String(b.nick || 'invitado').slice(0, 40);
     const user = { id: `sim:${nick}`, handle: nick, nick, avatar: '' };
     const count = Math.max(1, Math.min(999, Math.floor(+b.count || 1)));
     if (b.kind === 'reset') { queue.credits = {}; persist(); }
-    else if (b.kind === 'gift') onGift(user, Math.max(1, +b.coins || 1) * count, String(b.gift || 'Rosa').slice(0, 40), count, b.gift === 'Rosa' ? '/img/rosa.png' : '');
-    else pushChat({ kind: 'chat', user, text: String(b.text || '').slice(0, 300) });
+    else if (b.kind === 'gift') onGift(user, Math.max(1, +b.coins || 1) * count, String(b.gift || 'Rosa').slice(0, 40), count, giftImgs[b.gift]?.img || (b.gift === 'Rosa' ? '/img/rosa.png' : '/img/moneda.png'));
+    else { gameChat(user, String(b.text || '')); pushChat({ kind: 'chat', user, text: String(b.text || '').slice(0, 300) }); }
     send(res, 200, { ok: true });
   },
 };

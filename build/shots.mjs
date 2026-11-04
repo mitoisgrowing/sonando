@@ -8,13 +8,15 @@ import WebSocket from 'ws';
 
 const CHROME = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const OUT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, '$1')), '..', 'release', 'screenshots');
-const BASE = 'http://127.0.0.1:5190';
+const BASE = process.env.BASE || 'http://127.0.0.1:5190';
 const SHOTS = [
   ['inicio', '/?demo', 1440, 900, 2500],
   ['panel', '/control?demo', 1600, 1000, 2500],
   ['pantalla-directo', '/stage?demo', 1920, 1080, 5000],
   ['tutorial', '/control?demo&tour', 1600, 1000, 2500],
   ['top', '/top?demo', 1200, 1400, 2000],
+  ['ruleta', '/stage?demo&game=ruleta', 1920, 1080, 9000],
+  ['batalla', '/stage?demo&game=batalla', 1920, 1080, 3000],
 ];
 fs.mkdirSync(OUT, { recursive: true });
 const port = 9333, dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sonando-shots-'));
