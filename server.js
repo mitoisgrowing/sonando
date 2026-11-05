@@ -84,7 +84,7 @@ let verifier = '';
 async function tokenRequest(body) {
   const r = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: config.clientId, ...body }),
+    body: new URLSearchParams({ client_id: config.clientId, ...body }), signal: AbortSignal.timeout(10000),
   });
   const j = await r.json();
   if (!r.ok) throw new Error(j.error_description || j.error || 'token');
@@ -95,7 +95,7 @@ async function tokenRequest(body) {
 async function sp(pathname, opts = {}) {
   if (!config.tokens) throw new Error('Spotify sin conectar');
   if (Date.now() > config.tokens.exp) await tokenRequest({ grant_type: 'refresh_token', refresh_token: config.tokens.refresh });
-  const r = await fetch(`https://api.spotify.com/v1${pathname}`, { ...opts, headers: { Authorization: `Bearer ${config.tokens.access}`, 'Content-Type': 'application/json' } });
+  const r = await fetch(`https://api.spotify.com/v1${pathname}`, { signal: AbortSignal.timeout(10000), ...opts, headers: { Authorization: `Bearer ${config.tokens.access}`, 'Content-Type': 'application/json' } });
   if (r.status === 204) return null;
   const text = await r.text();
   const j = text ? JSON.parse(text) : null;
@@ -191,8 +191,10 @@ async function withRoman(track, lyr) {
 
 // ---------- reproductor: sigue a Spotify y le pasa la siguiente ----------
 let starting = false;
+let ticking = false;
 async function tick() {
-  if (!config.tokens) return;
+  if (!config.tokens || ticking) return;
+  ticking = true;
   try {
     const t0 = Date.now();
     const p = await sp('/me/player/currently-playing');
@@ -254,8 +256,8 @@ async function tick() {
     }
     if (Date.now() > retryAt) state.spotify = { ...state.spotify, status: 'ok', error: '' };
   } catch (e) {
-    state.spotify = { status: config.tokens ? 'ok' : 'off', error: e.message };
-  }
+    state.spotify = { status: config.tokens ? 'ok' : 'off', error: e.name === 'TimeoutError' ? 'Spotify tarda en responder: revisa tu conexión' : e.message };
+  } finally { ticking = false; }
   broadcast();
 }
 let endTimer = null, skipTimer = null, retryAt = 0;
@@ -477,6 +479,15 @@ function onGift(user, coins, giftName, count, image = '') {
   persist();
 }
 
+// el mismo mensaje no se cuenta dos veces (reconexiones, reenvíos de TikTok)
+const seenIds = new Set();
+function seen(d) {
+  const id = d.common?.msgId ?? d.msgId;
+  if (!id) return false;
+  if (seenIds.has(String(id))) return true;
+  seenIds.add(String(id)); if (seenIds.size > 2000) seenIds.delete(seenIds.values().next().value);
+  return false;
+}
 async function connectTikTok(name) {
   if (tiktok) { try { await tiktok.disconnect(); } catch {} tiktok = null; }
   config.tiktokUser = name.replace(/^@/, '').trim(); save('config.json', config);
@@ -484,6 +495,7 @@ async function connectTikTok(name) {
   const c = new TikTokLiveConnection(config.tiktokUser, { processInitialData: false });
   let chatDebug = 0;
   c.on(WebcastEvent.CHAT, d => {
+    if (tiktok !== c || seen(d)) return;
     if (state.test) setTest(false);
     const text = d.comment ?? d.content ?? d.common?.describe ?? '';
     if (!text && chatDebug++ < 3) console.log('chat sin texto, campos:', JSON.stringify(d, (k, v) => typeof v === 'string' && v.length > 80 ? v.slice(0, 80) : v).slice(0, 1500));
@@ -493,16 +505,21 @@ async function connectTikTok(name) {
     pushChat({ kind: 'chat', user, text });
   });
   c.on(WebcastEvent.GIFT, d => {
+    if (tiktok !== c || seen(d)) return;
     if (state.test) setTest(false);
     if (d.giftDetails?.giftType === 1 && !d.repeatEnd) return; // racha en curso: se cuenta al cerrarse
     const count = d.repeatCount || 1;
     const g = d.giftDetails;
     onGift(userOf(d.user), (g?.diamondCount || 1) * count, g?.giftName || 'Regalo', count, imgUrl(g?.giftImage, g?.icon, g?.previewImage, d.extendedGiftInfo?.image));
   });
-  c.on(ControlEvent.DISCONNECTED, () => { state.tiktok.status = 'off'; broadcast(); });
-  c.on(WebcastEvent.STREAM_END, () => { state.tiktok = { ...state.tiktok, status: 'off', error: 'El directo ha terminado' }; broadcast(); });
+  c.on(ControlEvent.DISCONNECTED, () => { if (tiktok === c) { state.tiktok.status = 'off'; broadcast(); } });
+  c.on(WebcastEvent.STREAM_END, () => { if (tiktok !== c) return; state.tiktok = { ...state.tiktok, status: 'off', error: 'El directo ha terminado' }; broadcast(); });
   tiktok = c;
-  try { await c.connect(); state.tiktok.status = 'on'; }
+  try {
+    await c.connect();
+    if (tiktok !== c) { c.disconnect().catch(() => {}); return; } // mientras conectaba pulsaste otra vez: gana la nueva
+    state.tiktok.status = 'on';
+  }
   catch (e) { state.tiktok = { ...state.tiktok, status: 'off', error: /offline|room id/i.test(e.constructor?.name + e.message) ? 'No encuentro ese directo: revisa el usuario y que estés en vivo' : e.message }; }
   broadcast();
 }
